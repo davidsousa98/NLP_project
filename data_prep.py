@@ -1,6 +1,6 @@
 
 def get_files_zip():
-    with zp.ZipFile("./data/NLP_data.zip") as myzip:
+    with zp.ZipFile("./data/nlp_data.zip") as myzip:
         list = myzip.namelist()
     return list
 
