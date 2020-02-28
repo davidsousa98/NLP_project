@@ -7,18 +7,16 @@ def get_files_zip():
     return list
 
 
-def read_text_zip(files):
+def read_txt_zip(files):
     df_list = []
     for file in files:
         with zp.ZipFile("./nlp_data.zip") as myzip:
             with myzip.open(file) as myfile:
-                df_list.append(open(myfile,'w+'))
+                df_list.append(myfile.read().decode("utf-8"))
     return df_list
 
 
 # Reading files from zip without extracting them
-# Warning is returned however it's not concerning!
-
-get_files_zip()
-
-read_text_zip()
+text_names = list(filter(lambda x: ".txt" in x, get_files_zip()))
+texts = read_txt_zip(text_names)
+df = pd.DataFrame({"names": text_names, "texts": texts})
