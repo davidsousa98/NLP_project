@@ -51,17 +51,21 @@
     <servers />
   </component>
   <component name="WindowStateProjectService">
+    <state x="137" y="18" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1582916154315">
+      <screen x="0" y="0" width="1366" height="728" />
+    </state>
+    <state x="137" y="18" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1366.728@0.0.1366.728" timestamp="1582916154315" />
     <state x="184" y="6" key="SettingsEditor" timestamp="1582897848239">
       <screen x="0" y="0" width="1366" height="728" />
     </state>
     <state x="184" y="6" key="SettingsEditor/0.0.1366.728@0.0.1366.728" timestamp="1582897848239" />
-    <state width="691" height="372" key="XDebugger.FullValuePopup" timestamp="1582908756217">
+    <state width="691" height="372" key="XDebugger.FullValuePopup" timestamp="1582910778549">
       <screen x="0" y="0" width="1366" height="728" />
     </state>
-    <state width="691" height="372" key="XDebugger.FullValuePopup/0.0.1366.728@0.0.1366.728" timestamp="1582908756217" />
-    <state x="379" y="187" key="com.intellij.ide.util.TipDialog" timestamp="1582903012312">
+    <state width="691" height="372" key="XDebugger.FullValuePopup/0.0.1366.728@0.0.1366.728" timestamp="1582910778549" />
+    <state x="379" y="187" key="com.intellij.ide.util.TipDialog" timestamp="1582912875842">
       <screen x="0" y="0" width="1366" height="728" />
     </state>
-    <state x="379" y="187" key="com.intellij.ide.util.TipDialog/0.0.1366.728@0.0.1366.728" timestamp="1582903012312" />
+    <state x="379" y="187" key="com.intellij.ide.util.TipDialog/0.0.1366.728@0.0.1366.728" timestamp="1582912875842" />
   </component>
 </project>
