@@ -30,7 +30,6 @@ train = train[["file", "author", "text"]]
 test = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
 
 # TODO: sample the books to create excerpts of 500 or 1000 words for each author
-
 def word_counter(text_list):
     """
     Function that receives a list of strings and returns the frequency of each word
@@ -45,6 +44,11 @@ def word_counter(text_list):
 word_count = word_counter(df["text"].to_list())
 word_count.head(20)
 # TODO: exclude the text corresponding to the beginning of the book
+# TODO: tokenize week days (e.g. sexta-feira, quinta-feira, sabado, ...), cidades portuguesas, datas, ...
+# TODO: include punctuation as features (atenção às reticências)
+# TODO: Perform POS filtering (Viterbi algorithm)
+# 1. Normalization (dates), 2. Lowercasing, 3. Tokenization (compounds, punctuation), 4. Stop-words, 5. Stemming and Lemmatisation, 6. POS filtering
+# TODO: build baseline with simple KNN (slides and labs)
 # a = train.loc[:, "text"].apply(lambda x: re.findall("\n{3,5}([\s\S]*)", x))
 
 from nltk.corpus import stopwords
