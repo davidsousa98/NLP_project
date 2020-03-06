@@ -1,9 +1,6 @@
 import zipfile as zp
 import pandas as pd
-<<<<<<< HEAD
-=======
 import itertools
->>>>>>> 238b08cf2b1aca24c6b75fcbfa38f9e15e3164fd
 import re
 
 def get_files_zip():
@@ -22,22 +19,12 @@ def read_txt_zip(files):
 
 
 # Reading files from zip without extracting them
-<<<<<<< HEAD
+
 text_names = list(filter(lambda x: ".txt" in x, get_files_zip()))
 texts = read_txt_zip(text_names)
 df = pd.DataFrame({"names": text_names, "texts": texts})
 
 
-#Clean data
-def token(text):
-    token = re.sub('\S+\$\d+( réis)*','#Price',text)
-    return token
-
-df['texts'].iloc[18] = token(df['texts'].iloc[18])
-
-a = df['texts'].apply(lambda x: re.findall('\$',x))
-# b = df['texts'].apply(lambda x: re.findall('\/',x))
-=======
 files = list(filter(lambda x: ".txt" in x, get_files_zip()))
 texts = read_txt_zip(files)
 df = pd.DataFrame({"file": files, "text": texts})
@@ -92,4 +79,16 @@ def rm_nonalphanumeric(string):
     re.su
 
 df["text"].apply(rm_nonalphanumeric)
->>>>>>> 238b08cf2b1aca24c6b75fcbfa38f9e15e3164fd
+
+
+#Clean data
+def token(text):
+    token = re.sub('\S+\$\d+( réis)*','#Price',text)
+    return token
+
+df['texts'].iloc[18] = token(df['texts'].iloc[18])
+
+a = df['texts'].apply(lambda x: re.findall('\$',x))
+# b = df['texts'].apply(lambda x: re.findall('\/',x))
+
+
