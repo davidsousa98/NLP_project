@@ -20,11 +20,6 @@ def read_txt_zip(files):
 
 # Reading files from zip without extracting them
 
-text_names = list(filter(lambda x: ".txt" in x, get_files_zip()))
-texts = read_txt_zip(text_names)
-df = pd.DataFrame({"names": text_names, "texts": texts})
-
-
 files = list(filter(lambda x: ".txt" in x, get_files_zip()))
 texts = read_txt_zip(files)
 df = pd.DataFrame({"file": files, "text": texts})

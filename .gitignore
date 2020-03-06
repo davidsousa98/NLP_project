@@ -1,4 +1,5 @@
 # User defined
+/.idea/
 nlp_data.zip
 
 # Byte-compiled / optimized / DLL files
@@ -199,3 +200,8 @@ fabric.properties
 
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
+.idea/misc.xml
+.idea/misc.xml
+.idea/misc.xml
+.idea/NLP_project.iml
+.idea/workspace.xml
