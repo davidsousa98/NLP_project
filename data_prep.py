@@ -86,9 +86,9 @@ def token(text):
     token = re.sub('\S+\$\d+( réis)*','#Price',text)
     return token
 
-df['texts'].iloc[18] = token(df['texts'].iloc[18])
+# df['texts'].iloc[18] = token(df['texts'].iloc[18])
 
 a = df['texts'].apply(lambda x: re.findall('\$',x))
-# b = df['texts'].apply(lambda x: re.findall('\/',x))
+
 
 
