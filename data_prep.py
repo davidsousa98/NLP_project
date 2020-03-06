@@ -92,3 +92,6 @@ a = df['texts'].apply(lambda x: re.findall('\$',x))
 # b = df['texts'].apply(lambda x: re.findall('\/',x))
 
 
+def date_token(text):
+    date_tokenized = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})', "#DATE", text)
+    return date_tokenized
