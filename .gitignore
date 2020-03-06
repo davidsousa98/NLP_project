@@ -1,6 +1,6 @@
 # User defined
 .idea/
-nlp_data.zip
+#nlp_data.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -200,8 +200,11 @@ fabric.properties
 
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
+<<<<<<< HEAD
+=======
 .idea/misc.xml
 .idea/misc.xml
 .idea/misc.xml
 .idea/NLP_project.iml
+>>>>>>> 45f8df36e290e59ce1f02e7fc54a5ef5c8ba0e49
 .idea/workspace.xml
