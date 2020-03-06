@@ -77,16 +77,35 @@ df["text"].apply(rm_nonalphanumeric)
 
 
 #Clean data
-def token(text):
+def price_token(text):
     token = re.sub('\S+\$\d+( réis)*','#Price',text)
+    return token
+
+def date_token(text):
+    token = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})', "#DATE", text)
     return token
 
 # df['texts'].iloc[18] = token(df['texts'].iloc[18])
 
 a = df['texts'].apply(lambda x: re.findall('\$',x))
 
+# Bag-of-words
+from sklearn.feature_extraction.text import CountVectorizer
+import numpy as np
 
+cv = CountVectorizer(max_df=0.9, binary=True)
 
-def date_token(text):
-    date_tokenized = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})', "#DATE", text)
-    return date_tokenized
+X = cv.fit_transform(train["text"])
+y = np.array(train["author"])
+
+# K-nearest neighbors
+from sklearn.neighbors import KNeighborsClassifier
+
+modelknn = KNeighborsClassifier(n_neighbors=5, weights='distance', algorithm='brute', leaf_size=30, p=2,
+                                         metric='cosine', metric_params=None, n_jobs=1)
+modelknn.fit(X,y)
+
+test4 = cv.transform(test.text)
+
+predict = modelknn.predict(test4)
+predict
