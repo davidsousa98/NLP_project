@@ -20,11 +20,6 @@ def read_txt_zip(files):
 
 # Reading files from zip without extracting them
 
-text_names = list(filter(lambda x: ".txt" in x, get_files_zip()))
-texts = read_txt_zip(text_names)
-df = pd.DataFrame({"names": text_names, "texts": texts})
-
-
 files = list(filter(lambda x: ".txt" in x, get_files_zip()))
 texts = read_txt_zip(files)
 df = pd.DataFrame({"file": files, "text": texts})
@@ -82,16 +77,17 @@ df["text"].apply(rm_nonalphanumeric)
 
 
 #Clean data
-def token(text):
+def price_token(text):
     token = re.sub('\S+\$\d+( réis)*','#Price',text)
     return token
 
 # df['texts'].iloc[18] = token(df['texts'].iloc[18])
 
-a = df['texts'].apply(lambda x: re.findall('\$',x))
-
+# a = df['text'].apply(lambda x: re.findall('\$',x))
 
 
 def date_token(text):
     date_tokenized = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})', "#DATE", text)
     return date_tokenized
+
+a = df['text'].apply(lambda x: re.findall('(Lisboa)',x))
