@@ -1,6 +1,6 @@
 # User defined
 .idea/
-nlp_data.zip
+#nlp_data.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
