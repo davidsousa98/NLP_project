@@ -59,6 +59,8 @@ from nltk.corpus import wordnet
 from nltk.stem import SnowballStemmer
 from bs4 import BeautifulSoup # useful in dealing with html
 import string
+import geonamescache
+
 
 stop = set(stopwords.words('portuguese'))
 # exclude = set(string.punctuation)
@@ -90,4 +92,14 @@ def date_token(text):
     date_tokenized = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})', "#DATE", text)
     return date_tokenized
 
-a = df['text'].apply(lambda x: re.findall('(Lisboa)',x))
+a = df['text'].apply(lambda x: re.findall(r"\bSantarém\b",x))
+
+cities = ['Aveiro','Beja','Braga','Bragança','Castelo Branco','Coimbra','Évora','Evora','Faro','Guarda','Leiria','Lisboa','Portalegre',
+          'Porto','Santarem','','']
+
+
+a = df['text'].apply(lambda x: re.findall('(?:% s)' % '|'.join(cities), x))
+
+l = []
+if any(word in df["text"] for word in cities):
+    l.append(word)
