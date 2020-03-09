@@ -102,7 +102,7 @@ from nltk.corpus import wordnet
 from nltk.stem import SnowballStemmer
 from bs4 import BeautifulSoup # useful in dealing with html
 import string
-import geonamescache
+
 
 
 # Reference: http://www.nltk.org/howto/portuguese_en.html
@@ -133,7 +133,8 @@ def date_token(text):
 
 # df['texts'].iloc[18] = token(df['texts'].iloc[18])
 
-a = df['texts'].apply(lambda x: re.findall('\$',x))
+a = df['text'].apply(lambda x: re.findall('\$',x))
+
 
 # Bag-of-words
 from sklearn.feature_extraction.text import CountVectorizer
@@ -141,19 +142,90 @@ import numpy as np
 
 cv = CountVectorizer(max_df=0.9, binary=True)
 
-X = cv.fit_transform(train["text"])
-y = np.array(train["author"])
+X = cv.fit_transform(train_df["text"])
+y = np.array(train_df["author"])
 
-# K-nearest neighbors
+# Split the training set into training and development set
+from sklearn.model_selection import train_test_split
+
+
+X_train, X_dev, y_train, y_dev = train_test_split(X,
+                                                    y,
+                                                    test_size=0.3,
+                                                    random_state=15,
+                                                    shuffle=True,
+                                                    stratify=y)
+
+# K-nearest neighbors algorithm
 from sklearn.neighbors import KNeighborsClassifier
 
 modelknn = KNeighborsClassifier(n_neighbors=5, weights='distance', algorithm='brute', leaf_size=30, p=2,
                                          metric='cosine', metric_params=None, n_jobs=1)
-modelknn.fit(X,y)
+modelknn.fit(X_train, y_train)
 
-test4 = cv.transform(test.text)
+predict_dev = modelknn.predict(X_dev)
 
-predict = modelknn.predict(test4)
+# Evaluate the metrics
+from sklearn.metrics import classification_report
+print(classification_report(predict_dev, y_dev, target_names=np.unique(predict_dev)))
+
+
+from sklearn.metrics import confusion_matrix
+confusion_matrix(predict_dev, y_dev)
+
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+
+
+def plot_cm(confusion_matrix: np.array,
+            classnames: list):
+    """
+    Function that creates a confusion matrix plot using the Wikipedia convention for the axis.
+    :param confusion_matrix: confusion matrix that will be plotted
+    :param classnames: labels of the classes
+
+    Returns:
+        - Plot of the Confusion Matrix
+    """
+
+    confusionmatrix = confusion_matrix
+    class_names = classnames
+
+    fig, ax = plt.subplots()
+    im = plt.imshow(confusionmatrix, cmap=plt.cm.cividis)
+    plt.colorbar()
+
+    # We want to show all ticks...
+    ax.set_xticks(np.arange(len(class_names)))
+    ax.set_yticks(np.arange(len(class_names)))
+    # ... and label them with the respective list entries
+    ax.set_xticklabels(class_names)
+    ax.set_yticklabels(class_names)
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(class_names)):
+        for j in range(len(class_names)):
+            text = ax.text(j, i, confusionmatrix[i, j],
+                           ha="center", va="center", color="w")
+
+    ax.set_title("Confusion Matrix")
+    plt.xlabel('Targets')
+    plt.ylabel('Predictions')
+    plt.ylim(top=len(class_names) - 0.5)  # adjust the top leaving bottom unchanged
+    plt.ylim(bottom=-0.5)  # adjust the bottom leaving top unchanged
+    return plt.show()
+
+plot_cm(confusion_matrix(predict_dev, y_dev), np.unique(predict_dev))
+
+# Predict the author in the test set
+pred_test = cv.transform(test_df["text"])
+predict_test = modelknn.predict(pred_test)
+predict_test
 
 
 a = df['text'].apply(lambda x: re.findall(r"\bSantarém\b",x))
