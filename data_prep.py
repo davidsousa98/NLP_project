@@ -100,7 +100,7 @@ from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from nltk.corpus import wordnet
 from nltk.stem import SnowballStemmer
-from bs4 import BeautifulSoup # useful in dealing with html
+# from bs4 import BeautifulSoup # useful in dealing with html
 import string
 import geonamescache
 
@@ -133,7 +133,7 @@ def date_token(text):
 
 # df['texts'].iloc[18] = token(df['texts'].iloc[18])
 
-a = df['texts'].apply(lambda x: re.findall('\$',x))
+# a = df['texts'].apply(lambda x: re.findall('\$',x))
 
 # Bag-of-words
 from sklearn.feature_extraction.text import CountVectorizer
@@ -141,8 +141,8 @@ import numpy as np
 
 cv = CountVectorizer(max_df=0.9, binary=True)
 
-X = cv.fit_transform(train["text"])
-y = np.array(train["author"])
+X = cv.fit_transform(train_df["text"])
+y = np.array(train_df["author"])
 
 # K-nearest neighbors
 from sklearn.neighbors import KNeighborsClassifier
@@ -151,21 +151,63 @@ modelknn = KNeighborsClassifier(n_neighbors=5, weights='distance', algorithm='br
                                          metric='cosine', metric_params=None, n_jobs=1)
 modelknn.fit(X,y)
 
-test4 = cv.transform(test.text)
+test4 = cv.transform(test_df.text)
 
 predict = modelknn.predict(test4)
 
+# Token cidades
+cities = pd.read_csv("./pt.csv")
+cities= list(cities['city'])
+cities.append('Lisboa')
+cities = [item.lower() for item in cities]
 
-a = df['text'].apply(lambda x: re.findall(r"\bSantarém\b",x))
+def token_cities(text):
+    for i in cities:
+        if i in text:
+            text = text.replace(i, '#CITY')
+    return text
 
-cities = ['Aveiro','Beja','Braga','Bragança','Castelo Branco','Coimbra','Évora','Evora','Faro','Guarda','Leiria','Lisboa','Portalegre',
-          'Porto','Santarem','','']
+# for i in range(0,len(df['text'])):
+#     df['text'].iloc[i] =  token_cities( df['text'].iloc[i])
+
+# a = df['text'].apply(lambda x: re.findall('(?:% s)' % '|'.join(cities), x))
+
+dias_semana = ['segunda-feira', 'terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado','domingo']
+
+def token_dias(text):
+    for i in dias_semana:
+        if i in text:
+            text = text.replace(i, '#DIA')
+    return text
+
+# for i in range(0,len(df['text'])):
+#     df['text'].iloc[i] =  token_dias( df['text'].iloc[i])
+# a = df['text'].apply(lambda x: re.findall('(?:% s)' % '|'.join(dias_semana), x))
+# a = df['text'].apply(lambda x: re.findall('#DIA', x))
+
+# TF-IDF
+
+from sklearn.feature_extraction.text import TfidfTransformer
+tfidf_vectorizer = TfidfTransformer()
+tfidf_vectorizer.fit(X)
+
+feature_names = cv.get_feature_names()
+doc = df["text"].iloc[100]
+tf_idf_vector = tfidf_vectorizer.transform(cv.transform([doc]))
+tf_idf_vector.toarray()
 
 
-a = df['text'].apply(lambda x: re.findall('(?:% s)' % '|'.join(cities), x))
+def extract_feature_scores(feature_names, document_vector):
+    """
+    Function that creates a dictionary with the TF-IDF score for each feature.
+    :param feature_names: list with all the feature words.
+    :param document_vector: vector containing the extracted features for a specific document
 
-l = []
-if any(word in df["text"] for word in cities):
-    l.append(word)
+    :return: returns a sorted dictionary "feature":"score".
+    """
+    feature2score = {}
+    for i in range(len(feature_names)):
+        feature2score[feature_names[i]] = document_vector[0][i]
+    return sorted(feature2score.items(), key=lambda kv: kv[1], reverse=True)
 
-
+extract_feature_scores(feature_names, tf_idf_vector.toarray())[:10]
