@@ -18,10 +18,8 @@ from sklearn.neighbors import KNeighborsClassifier
 
 # TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
 # TODO: exclude the text corresponding to the beginning of the book
-# TODO: tokenize week days (e.g. sexta-feira, quinta-feira, sabado, ...), cidades portuguesas, datas, ...
 # TODO: Perform POS filtering (Viterbi algorithm)
 # TODO: Balance training set according to author distribution in "population"
-# TODO: Acrescentar token cidades do florindo
 
 # Building Corpus
 # ----------------------------------------------------------------------------------------------------------------------
@@ -81,7 +79,7 @@ def clean(text_list, punctuation=None, lemmatize=None, stemmer=None):
         text = re.sub('\S+\$\d+( réis)*', '#PRICE', text)  # price token
         text = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})',
                       "#DATE", text)  # date token
-        text = re.sub('[0-9]+', '#NUMBER', text)
+        text = re.sub('[0-9]+', '#NUMBER', text)  # number token
 
         # REMOVE PUNCTUATION - Even if we end up not removing punctuation we need to watch out with some symbols
         # (e.g. *, %, >)
@@ -162,47 +160,10 @@ def sample_excerpts(data):
 
 train_df = sample_excerpts(train_df)
 train_df["word_count"] = train_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))  # creating number of words column
-
 # train_df["word_count"].describe()
+
 # Feature Engineering
 # ----------------------------------------------------------------------------------------------------------------------
-# Bag-of-words
-cv = CountVectorizer(max_df=0.9, binary=True)
-
-X = cv.fit_transform(train_df["text"])
-y = np.array(train_df["author"])
-
-# Model
-# ----------------------------------------------------------------------------------------------------------------------
-# K-nearest neighbors
-modelknn = KNeighborsClassifier(n_neighbors=5, weights='distance', algorithm='brute', leaf_size=30, p=2,
-                                         metric='cosine', metric_params=None, n_jobs=1)
-modelknn.fit(X, y)
-
-test4 = cv.transform(test_df.text)
-
-predict = modelknn.predict(test4)
-predict
-
-
-# Extras
-# ----------------------------------------------------------------------------------------------------------------------
-def word_counter(text_list):
-    """
-    Function that receives a list of strings and returns the frequency of each word
-    in the set of all strings.
-    """
-    split = [i.split() for i in text_list]
-    words_in_df = list(itertools.chain.from_iterable(split)) # merges lists in list
-    # Count all words
-    freq = pd.Series(words_in_df).value_counts()
-    return freq
-
-word_count = word_counter(df["text"].to_list())
-word_count.head(20)
-
-
-
 # Bag-of-words
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
@@ -212,7 +173,9 @@ cv = CountVectorizer(max_df=0.9, binary=True)
 X = cv.fit_transform(train_df["text"])
 y = np.array(train_df["author"])
 
-# Split the training set into training and development set
+# Model
+# ----------------------------------------------------------------------------------------------------------------------
+# K-nearest neighbors
 from sklearn.model_selection import train_test_split
 
 
@@ -232,7 +195,7 @@ modelknn.fit(X_train, y_train)
 
 predict_dev = modelknn.predict(X_dev)
 
-# Evaluate the metrics
+# Model evaluation
 from sklearn.metrics import classification_report
 print(classification_report(predict_dev, y_dev, target_names=np.unique(predict_dev)))
 
@@ -289,10 +252,32 @@ def plot_cm(confusion_matrix: np.array,
 
 plot_cm(confusion_matrix(predict_dev, y_dev), np.unique(predict_dev))
 
+# Prediction
+# ----------------------------------------------------------------------------------------------------------------------
 # Predict the author in the test set
 pred_test = cv.transform(test_df["text"])
 predict_test = modelknn.predict(pred_test)
 predict_test
+
+# Extras
+# ----------------------------------------------------------------------------------------------------------------------
+def word_counter(text_list):
+    """
+    Function that receives a list of strings and returns the frequency of each word
+    in the set of all strings.
+    """
+    split = [i.split() for i in text_list]
+    words_in_df = list(itertools.chain.from_iterable(split)) # merges lists in list
+    # Count all words
+    freq = pd.Series(words_in_df).value_counts()
+    return freq
+
+word_count = word_counter(df["text"].to_list())
+word_count.head(20)
+
+
+
+
 
 
 
