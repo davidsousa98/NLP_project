@@ -1,5 +1,7 @@
 from tqdm import tqdm_notebook as tqdm
 import unicodedata
+import io
+import requests
 import zipfile as zp
 import numpy as np
 import pandas as pd
@@ -52,7 +54,10 @@ test_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
 
 # Preprocessing - Reference: http://www.nltk.org/howto/portuguese_en.html
 # ----------------------------------------------------------------------------------------------------------------------
-# cities = pd.read_csv("https://simplemaps.com/static/data/country-cities/pt/pt.csv")
+
+url = "https://simplemaps.com/static/data/country-cities/pt/pt.csv"
+s = requests.get(url).content
+cities = pd.read_csv(io.StringIO(s.decode('utf-8')))  # Cities for tokenization
 
 def clean(text_list, punctuation=None, lemmatize=None, stemmer=None):
     """
