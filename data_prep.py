@@ -1,7 +1,11 @@
+from random import choice
 import zipfile as zp
 import pandas as pd
 import itertools
 import re
+import nltk
+# nltk.download('punkt')
+
 
 def get_files_zip():
     with zp.ZipFile("./nlp_data.zip") as myzip:
@@ -19,18 +23,52 @@ def read_txt_zip(files):
 
 
 # Reading files from zip without extracting them
-
 files = list(filter(lambda x: ".txt" in x, get_files_zip()))
 texts = read_txt_zip(files)
 df = pd.DataFrame({"file": files, "text": texts})
 
+# Creating train_df and test_df
 df["type"] = df["file"].apply(lambda x: re.findall(r"(^[a-z]+)/", x)[0])
-train = df.loc[df["type"] == "train", ["file", "text"]].reset_index(drop=True)
-train["author"] = train["file"].apply(lambda x: re.findall(r"/([a-zA-Z]+)/", x)[0])
-train = train[["file", "author", "text"]]
-test = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
+train_df = df.loc[df["type"] == "train", ["file", "text"]].reset_index(drop=True)
+train_df["author"] = train_df["file"].apply(lambda x: re.findall(r"/([a-zA-Z]+)/", x)[0])
+train_df["book_id"] = train_df["file"].str.extract(r"/.+/(.+).txt")
+train_df = train_df[["file", "book_id", "author", "text"]]
+test_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
 
-# TODO: sample the books to create excerpts of 500 or 1000 words for each author
+
+def sample_excerpts(data):
+
+    def extract_excerpts(row):
+        words = nltk.word_tokenize(row["text"])
+        groups = []
+        group = []
+        stoppers = [".", "...", "!", "?"]
+        for word in words:
+            group.append(word)
+            if (len(group) >= 480) & (group[-1] in stoppers):
+                groups.append((row["book_id"], row["author"], " ".join(group)))
+                group = []
+            elif len(group) >= 600:  # Dealing with lack of punctuation
+                groups.append((row["book_id"], row["author"], " ".join(group)))
+                group = []
+        return groups
+
+    dataframe = []
+    for _, row in data.iterrows():
+        dataframe += extract_excerpts(row)
+    return pd.DataFrame(dataframe, columns=["book_id", "author", "text"])
+
+
+# Sampling the texts
+samples = sample_excerpts(train_df)
+samples["word_count"] = samples["text"].apply(lambda x: len(nltk.word_tokenize(x)))  # creating number of words column
+# samples["word_count"].describe()
+
+# Updating train_df
+train_df = samples
+
+# TODO: clean texts before sampling to reduce word_count variance.
+# TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
 def word_counter(text_list):
     """
     Function that receives a list of strings and returns the frequency of each word
