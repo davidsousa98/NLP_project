@@ -1,9 +1,11 @@
-from random import choice
 import zipfile as zp
 import pandas as pd
 import itertools
 import re
 import nltk
+import string
+
+# nltk.download('rslp')
 # nltk.download('punkt')
 
 
@@ -34,6 +36,8 @@ train_df["author"] = train_df["file"].apply(lambda x: re.findall(r"/([a-zA-Z]+)/
 train_df["book_id"] = train_df["file"].str.extract(r"/.+/(.+).txt")
 train_df = train_df[["file", "book_id", "author", "text"]]
 test_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
+
+
 
 
 def sample_excerpts(data):
@@ -90,31 +94,23 @@ word_count.head(20)
 # TODO: build baseline with simple KNN (slides and labs)
 # a = train.loc[:, "text"].apply(lambda x: re.findall("\n{3,5}([\s\S]*)", x))
 
-from nltk.corpus import stopwords
-from nltk.stem.wordnet import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
-from nltk.corpus import wordnet
-from nltk.stem import SnowballStemmer
-from bs4 import BeautifulSoup # useful in dealing with html
-import string
-
-stop = set(stopwords.words('portuguese'))
-# exclude = set(string.punctuation)
-lemma = WordNetLemmatizer('portuguese')
-snowball_stemmer = SnowballStemmer('portuguese')
-list_of_words = ["consultoria", "consultores", "consulta", "consultava"]
-for word in list_of_words:
-    print("Lemma of {} is {}".format(word,lemma.lemmatize(word)))
-    print("Stem of {} is {}".format(word,snowball_stemmer.stem(word)))
-    print("----")
-
-def rm_nonalphanumeric(string):
-    re.su
-
-df["text"].apply(rm_nonalphanumeric)
+# Reference: http://www.nltk.org/howto/portuguese_en.html
+stopw = set(nltk.corpus.stopwords.words('portuguese'))
+punct = set(string.punctuation) # Even if we end up not removing punctuation we need to watch out with some symbols (e.g. *, %, >)
+stemmer = nltk.stem.RSLPStemmer()
+# Stemmer example
+# list_of_words = ["consultoria", "consultores", "consulta", "consultava"]
+# for word in list_of_words:
+#     print("Stem of {} is {}".format(word, stemmer.stem(word)))
+#     print("----")
+#
+# def rm_nonalphanumeric(string):
+#     re.su
+#
+# df["text"].apply(rm_nonalphanumeric)
 
 
-#Clean data
+# Clean data
 def price_token(text):
     token = re.sub('\S+\$\d+( réis)*','#Price',text)
     return token
