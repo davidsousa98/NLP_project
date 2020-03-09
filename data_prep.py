@@ -212,9 +212,6 @@ word_count.head(20)
 
 # Clean data
 
-
 # df['texts'].iloc[18] = token(df['texts'].iloc[18])
 
 # a = df['texts'].apply(lambda x: re.findall('\$',x))
-
-
