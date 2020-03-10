@@ -2,7 +2,7 @@ import zipfile as zp
 import io
 import requests
 import unicodedata
-from tqdm import tqdm_notebook as tqdm
+# from tqdm import tqdm_notebook as tqdm
 import itertools
 import numpy as np
 import pandas as pd
@@ -43,12 +43,13 @@ def read_txt_zip(files):
     return df_list
 
 
-def clean(text_list, punctuation, lemmatize=None, stemmer=None):
+def clean(text_list, punctuation, stoppers, lemmatize=None, stemmer=None):
     """
     Function that a receives a list of strings and preprocesses it.
 
     :param text_list: list of strings.
     :param punctuation: list of punctuation to exclude.
+    :param stoppers: list of punctuation that defines the end of an excerpt.
     :param lemmatize: lemmatizer to apply if provided.
     :param stemmer: stemmer to apply if provided.
 
@@ -56,7 +57,7 @@ def clean(text_list, punctuation, lemmatize=None, stemmer=None):
         - list of cleaned strings.
     """
     updates = []
-    for j in tqdm(range(len(text_list))):
+    for j in range(len(text_list)):
 
         text = text_list[j]
 
@@ -88,7 +89,7 @@ def clean(text_list, punctuation, lemmatize=None, stemmer=None):
 
         # REMOVE PUNCTUATION, SEPARATE KEEP PUNCTUATION WITH SPACES AND KEEP TOKENS #
         def repl(matchobj):
-            keep_punct = list(set(punct) - set(punctuation) - set("#"))
+            keep_punct = list(set(punct) - (set(punctuation) - set(stoppers)) - set("#"))
             if matchobj.group(0) in keep_punct:
                 return " {} ".format(matchobj.group(0))
             elif matchobj.group(0) == "#":
@@ -132,12 +133,13 @@ def update_df(dataframe, list_updated):
     dataframe.update(pd.Series(list_updated, name="text"))  # Modify in place using non-NA values from another DataFrame
 
 
-def sample_excerpts(dataframe):
+def sample_excerpts(dataframe, stoppers):
     """
     Function that receives a DataFrame and creates subsets of ~500 words of each
     string in its "text" column.
 
     :param dataframe: DataFrame to create subsets.
+    :param stoppers: list of punctuation that defines the end of an excerpt.
 
     Returns:
         - DataFrame object with a new text column that contains the subsets.
@@ -147,7 +149,6 @@ def sample_excerpts(dataframe):
         words = word_tokenize(row["text"])
         groups = []
         group = []
-        stoppers = [".", "...", "!", "?"]
         for word in words:
             group.append(word)
             if (len(group) >= 485) & (group[-1] in stoppers):

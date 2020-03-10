@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import re
 import nltk
+from imblearn.under_sampling import RandomUnderSampler
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
@@ -13,7 +14,8 @@ from sklearn.metrics import confusion_matrix
 
 # TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
 # TODO: Perform POS filtering (Viterbi algorithm)
-# TODO: Balance training set according to author distribution in "population"
+# TODO: Balance training set according to author distribution in "population" (population distribution reflected in
+#  training set?)
 
 # Building Corpus
 # ----------------------------------------------------------------------------------------------------------------------
@@ -38,6 +40,7 @@ updates = clean(
     train_df["text"],
     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[',  '\\', ']', '^', '_',
                  '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
+    stoppers=[".", "...", "!", "?"],
     stemmer=nltk.stem.SnowballStemmer('portuguese')
 )
 update_df(train_df, updates)
@@ -50,16 +53,32 @@ non_alphanum = non_alphanum.loc[~non_alphanum.isna()]
 
 # Sampling Excerpts
 # ----------------------------------------------------------------------------------------------------------------------
-train_df = sample_excerpts(train_df)
-train_df["word_count"] = train_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))  # creating number of words column
-# train_df["word_count"].describe() # word count mean is around 500
+train_excerpt_df = sample_excerpts(dataframe=train_df,
+                                   stoppers=[".", "...", "!", "?"])
+# creating number of words column
+train_excerpt_df["word_count"] = train_excerpt_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
+train_excerpt_df["word_count"].describe()  # word count mean is around 500
+
+# Balancing the excerpts according to the target population distribution
+# original_props = {"JoseRodriguesSantos": 52,
+#                   "JoseSaramago": 79,
+#                   "CamiloCasteloBranco": 131,
+#                   "EcaDeQueiros": 33,
+#                   "AlmadaNegreiros": 59,
+#                   "LuisaMarquesSilva": 59}
+# rus = RandomUnderSampler(random_state=15, sampling_strategy=original_props)
+# X_res, y_res = rus.fit_resample(train_excerpt_df.drop("author", axis=1), train_excerpt_df["author"])
+# train_excerpt_df = pd.concat([X_res, y_res], axis=1)
+# train_excerpt_df["author"].value_counts()/train_excerpt_df.shape[0]
+# train_df["author"].value_counts()/train_df.shape[0]
 
 # Feature Engineering
 # ----------------------------------------------------------------------------------------------------------------------
 # Bag-of-words
-cv = CountVectorizer(max_df=0.9, binary=True)  # ignores terms with document frequency above 0.9
-X = cv.fit_transform(train_df["text"])
-y = np.array(train_df["author"])
+cv = CountVectorizer(max_df=0.9, binary=True, stop_words=[".", "...", "!", "?"])  # ignores terms with document
+# frequency above 0.9
+X = cv.fit_transform(train_excerpt_df["text"])
+y = np.array(train_excerpt_df["author"])
 
 # Model
 # ----------------------------------------------------------------------------------------------------------------------
@@ -94,6 +113,7 @@ test_texts = clean(
     test_df["text"],
     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[',  '\\', ']', '^', '_',
                  '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
+    stoppers=[".", "...", "!", "?"],
     stemmer=nltk.stem.SnowballStemmer('portuguese')
 )
 X_test = cv.transform(test_texts)
