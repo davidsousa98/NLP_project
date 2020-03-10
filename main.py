@@ -45,6 +45,9 @@ updates = clean(
 )
 update_df(train_df, updates)
 
+# Data Exploration
+# ----------------------------------------------------------------------------------------------------------------------
+# See Keyword Extraction Notebook (words frequency, top unigrams, bigrams, ...)
 # Obtaining word frequency, token frequency and finding non alphanumeric characters
 word_freq = word_counter(train_df["text"].to_list())  # possibly we should remove some more punctuation
 token_freq = word_freq.loc[word_freq.index.str.contains("#")]
