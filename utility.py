@@ -12,7 +12,10 @@ from string import punctuation as punct
 from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk import word_tokenize
+from sklearn.feature_extraction.text import CountVectorizer
 
+# import matplotlib
+# matplotlib.use('TkAgg')
 
 def get_files_zip():
     """
@@ -217,3 +220,53 @@ def word_counter(text_list, top=None):
         return freq.head(top)
     else:
         return freq
+
+def save_excel(dataframe, sheetname):
+    """
+    Function that saves the evaluation metrics into a excel file.
+
+    :param dataframe: dataframe that contains the metrics.
+    :param sheetname: name of the sheet containing the parameterization.
+
+    """
+    dataframe.to_excel('./metrics.xls', sheet_name=sheetname)
+
+def get_top_n_grams(corpus, top_k, n):
+    """
+    Function that receives a list of documents (corpus) extracts
+        the top k most frequent n-grams for that corpus and plots the frequencies in a bar plot.
+
+    :param corpus: list of texts
+    :param top_k: int with the number of n-grams that we want to extract
+    :param n: n gram type to be considered
+             (if n=1 extracts unigrams, if n=2 extracts bigrams, ...)
+
+    :return: Returns a sorted dataframe in which the first column
+        contains the extracted ngrams and the second column contains
+        the respective counts
+    """
+    vec = CountVectorizer(ngram_range=(n, n), max_features=2000).fit(corpus)
+
+    bag_of_words = vec.transform(corpus)
+
+    sum_words = bag_of_words.sum(axis=0)
+
+    words_freq = []
+    for word, idx in vec.vocabulary_.items():
+        words_freq.append((word, sum_words[0, idx]))
+
+    words_freq = sorted(words_freq, key=lambda x: x[1], reverse=True)
+    top_df = pd.DataFrame(words_freq[:top_k])
+    top_df.columns = ["Ngram", "Freq"]
+
+    x_labels = top_df["Ngram"][:30]
+    y_pos = np.arange(len(x_labels))
+    values = top_df["Freq"][:30]
+    plt.bar(y_pos, values, align='center', alpha=0.5)
+    plt.xticks(y_pos, x_labels)
+    plt.ylabel('Frequencies')
+    plt.title('Words')
+    plt.xticks(rotation=90)
+    plt.show()
+    return top_df
+

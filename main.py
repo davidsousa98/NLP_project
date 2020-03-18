@@ -1,4 +1,4 @@
-from utility import get_files_zip, read_txt_zip, clean, update_df, sample_excerpts, plot_cm, word_counter
+from utility import get_files_zip, read_txt_zip, clean, update_df, sample_excerpts, plot_cm, word_counter, save_excel, get_top_n_grams
 import numpy as np
 import pandas as pd
 import re
@@ -9,6 +9,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 # nltk.download('rslp')
 # nltk.download('punkt')
 
@@ -83,6 +85,28 @@ cv = CountVectorizer(max_df=0.9, binary=True, stop_words=[".", "...", "!", "?"])
 X = cv.fit_transform(train_excerpt_df["text"])
 y = np.array(train_excerpt_df["author"])
 
+# N-Gram
+cv = CountVectorizer(
+    max_df=0.9,
+    binary=False,
+    stop_words=[".", "...", "!", "?"],
+    ngram_range=(1,3)
+)
+X = cv.fit_transform(train_excerpt_df["text"])
+y = np.array(train_excerpt_df["author"])
+
+top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=1)
+# top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=2)
+# top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=3)
+
+# TF-IDF
+
+cv = TfidfVectorizer(max_df=0.9, stop_words=[".", "...", "!", "?"], ngram_range = (1,3))
+
+X = cv.fit_transform(train_excerpt_df["text"])
+
+feature_names = cv.get_feature_names()
+
 # Model
 # ----------------------------------------------------------------------------------------------------------------------
 # Train / Test split
@@ -92,6 +116,15 @@ X_train, X_dev, y_train, y_dev = train_test_split(X,
                                                   random_state=15,
                                                   shuffle=True,
                                                   stratify=y)
+
+#Naive Bayes Classifier
+
+from sklearn.naive_bayes import GaussianNB
+modelnaive = GaussianNB()
+
+X_train = X_train.toarray()
+modelnaive.fit(X_train, y_train)
+predict_dev = modelnaive.predict(X_dev)
 
 # K-nearest neighbors
 modelknn = KNeighborsClassifier(n_neighbors=5,
@@ -107,6 +140,9 @@ predict_dev = modelknn.predict(X_dev)
 
 # Model evaluation
 print(classification_report(predict_dev, y_dev, target_names=list(np.unique(predict_dev))))
+evaluation_metrics = pd.DataFrame(classification_report(predict_dev, y_dev, target_names=list(np.unique(predict_dev)), output_dict=True))
+save_excel(evaluation_metrics, 'NGRAM13_KNN5') # save the results in a excel file
+
 plot_cm(confusion_matrix(predict_dev, y_dev), list(np.unique(predict_dev)))  # plot confusion matrix
 
 # Prediction
