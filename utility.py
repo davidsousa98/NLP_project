@@ -235,11 +235,11 @@ def save_excel(dataframe, sheetname, filename="metrics"):
     :param filename: specifies the name of the xlsx file.
 
     """
-    if not os.path.isfile("./{}.xlsx".format(filename)):
+    if not os.path.isfile("./outputs/{}.xlsx".format(filename)):
         mode = 'w'
     else:
         mode = 'a'
-    writer = pd.ExcelWriter('./{}.xlsx'.format(filename), engine='openpyxl', mode=mode)
+    writer = pd.ExcelWriter('./outputs/{}.xlsx'.format(filename), engine='openpyxl', mode=mode)
     dataframe.to_excel(writer, sheet_name=sheetname)
     writer.save()
 
