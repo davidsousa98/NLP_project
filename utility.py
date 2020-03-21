@@ -1,3 +1,4 @@
+import os
 import zipfile as zp
 import io
 import requests
@@ -12,7 +13,9 @@ from string import punctuation as punct
 from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk import word_tokenize
+from sklearn.metrics import recall_score
 from sklearn.feature_extraction.text import CountVectorizer
+from joblib import dump
 
 # import matplotlib
 # matplotlib.use('TkAgg')
@@ -221,15 +224,24 @@ def word_counter(text_list, top=None):
     else:
         return freq
 
-def save_excel(dataframe, sheetname):
+
+def save_excel(dataframe, sheetname, filename="metrics"):
     """
     Function that saves the evaluation metrics into a excel file.
 
     :param dataframe: dataframe that contains the metrics.
     :param sheetname: name of the sheet containing the parameterization.
+    :param filename: specifies the name of the xlsx file.
 
     """
-    dataframe.to_excel('./metrics.xls', sheet_name=sheetname)
+    if not os.path.isfile("./{}.xlsx".format(filename)):
+        mode = 'w'
+    else:
+        mode = 'a'
+    writer = pd.ExcelWriter('./{}.xlsx'.format(filename), engine='openpyxl', mode=mode)
+    dataframe.to_excel(writer, sheet_name=sheetname)
+    writer.save()
+
 
 def get_top_n_grams(corpus, top_k, n):
     """
@@ -270,3 +282,50 @@ def get_top_n_grams(corpus, top_k, n):
     plt.show()
     return top_df
 
+
+def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
+    """
+        Function receives a list of GridSearch objects and fits them to the data. Returns the best parameters in each
+        grid together with the respective macro recall score. Writes and excel file with information on the best
+        parameters for each Pipeline and exports the best 3 Pipelines as pickle files.
+
+        :param grids: list of GridSearch objects
+        :param X_train: X train
+        :param y_train: target train
+        :param X_test: X test
+        :param y_test: target test
+        :param grid_labels: list with a label for each GridSearch object
+
+        """
+    print('Performing model optimizations...')
+    scores = []
+    fitted_pipelines = []
+    for gs, label in zip(grids, grid_labels):
+        print('\nEstimator: %s' % label)
+        # Fit grid search
+        gs.fit(X_train, y_train)
+        # Best params
+        print('Best params: %s' % gs.best_params_)
+        # Best training data score
+        print('Best training score: %.3f' % gs.best_score_)
+        # Predict on test data with best params
+        y_pred = gs.predict(X_test)
+        # Test data score of model with best params
+        print('Test set score for best params: %.3f ' % recall_score(y_test, y_pred, average="macro"))
+        # Save test scores for Pipeline Summary
+        scores.append(recall_score(y_test, y_pred, average="macro"))
+        # Save fitted pipeline object for exporting pickle ahead
+        fitted_pipelines.append(gs)
+        # Save Pipeline name and best parameters to excel
+        best_params = pd.DataFrame({k: str(v) for (k, v) in gs.best_params_.items()}, index=[label])
+        save_excel(best_params, label, "Pipelines")
+    # Save Pipeline Summary to excel
+    pipeline_summary = pd.DataFrame({"Pipeline": grid_labels, "Score": scores})
+    save_excel(pipeline_summary, "Pipeline_Summary", "Pipelines")
+    print('\nPipeline with best test set score: %s'
+          % pipeline_summary.loc[pipeline_summary["Score"] == pipeline_summary["Score"].max(), "Pipeline"])
+    # Save top 3 grid search pipeline to pickle
+    for top, i in enumerate(np.array(scores).argsort()[-3:][::-1]):
+        dump_file = 'best_gs_pipeline{}.pkl'.format(top)
+        dump(fitted_pipelines[i], dump_file, compress=1)
+        print('\nSaved %s grid search pipeline to file: %s' % (grid_labels[i], dump_file))

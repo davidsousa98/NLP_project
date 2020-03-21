@@ -1,23 +1,23 @@
-from utility import get_files_zip, read_txt_zip, clean, update_df, sample_excerpts, plot_cm, word_counter, save_excel, get_top_n_grams
+from utility import get_files_zip, read_txt_zip, clean, update_df, sample_excerpts, plot_cm, word_counter, save_excel, \
+    get_top_n_grams, model_selection
 import numpy as np
 import pandas as pd
 import re
 import nltk
 from imblearn.under_sampling import RandomUnderSampler
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.naive_bayes import ComplementNB
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report, confusion_matrix, recall_score, make_scorer
+from sklearn.pipeline import Pipeline
 
 # nltk.download('rslp')
 # nltk.download('punkt')
 
 # TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
-# TODO: Perform POS filtering (Viterbi algorithm)
-# TODO: Balance training set according to author distribution in "population" (population distribution reflected in
-#  training set?)
+# TODO: Perform POS tagging (Viterbi algorithm). 1) filter out unnecessary tags; 2) count the number of each tag
+# TODO: Perform ensemble on best models
 
 # Building Corpus
 # ----------------------------------------------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ train_df["book_id"] = train_df["file"].str.extract(r"/.+/(.+).txt")
 train_df = train_df[["file", "book_id", "author", "text"]]
 
 # Creating test_df
-test_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
+submission_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
 
 # Preprocessing - Reference: http://www.nltk.org/howto/portuguese_en.html
 # ----------------------------------------------------------------------------------------------------------------------
@@ -90,7 +90,7 @@ cv = CountVectorizer(
     max_df=0.9,
     binary=False,
     stop_words=[".", "...", "!", "?"],
-    ngram_range=(1,3)
+    ngram_range=(1, 3)
 )
 X = cv.fit_transform(train_excerpt_df["text"])
 y = np.array(train_excerpt_df["author"])
@@ -100,56 +100,137 @@ top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=1)
 # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=3)
 
 # TF-IDF
-
-cv = TfidfVectorizer(max_df=0.9, stop_words=[".", "...", "!", "?"], ngram_range = (1,3))
-
+cv = TfidfVectorizer(max_df=0.9, stop_words=[".", "...", "!", "?"], ngram_range=(1, 3))
 X = cv.fit_transform(train_excerpt_df["text"])
+y = np.array(train_excerpt_df["author"])
 
 feature_names = cv.get_feature_names()
 
 # Model
 # ----------------------------------------------------------------------------------------------------------------------
 # Train / Test split
-X_train, X_dev, y_train, y_dev = train_test_split(X,
-                                                  y,
-                                                  test_size=0.3,
-                                                  random_state=15,
-                                                  shuffle=True,
-                                                  stratify=y)
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                    test_size=0.3,
+                                                    random_state=15,
+                                                    shuffle=True,
+                                                    stratify=y)
 
 #Naive Bayes Classifier
-
-from sklearn.naive_bayes import GaussianNB
-modelnaive = GaussianNB()
-
-X_train = X_train.toarray()
+modelnaive = ComplementNB()  # ComplementNB appropriate for text data and imbalanced classes
 modelnaive.fit(X_train, y_train)
-y_pred = modelnaive.predict(X_dev)
+y_pred = modelnaive.predict(X_test)
 
 # K-nearest neighbors
 modelknn = KNeighborsClassifier(n_neighbors=5,
                                 weights='distance',
-                                algorithm='brute',
-                                leaf_size=30,
-                                p=2,
-                                metric='cosine',
-                                metric_params=None,
-                                n_jobs=1)
+                                metric='cosine')
 modelknn.fit(X_train, y_train)
-y_pred = modelknn.predict(X_dev)
+y_pred = modelknn.predict(X_test)
 
-# Model evaluation
-print(classification_report(y_dev, y_pred, target_names=list(np.unique(y_pred))))
-evaluation_metrics = pd.DataFrame(classification_report(y_dev, y_pred, target_names=list(np.unique(y_pred)), output_dict=True))
-save_excel(evaluation_metrics, 'NGRAM13_KNN5') # save the results in a excel file
+# Model Selection
+# ----------------------------------------------------------------------------------------------------------------------
+# Reference: https://www.kdnuggets.com/2018/01/managing-machine-learning-workflows-scikit-learn-pipelines-part-3.html
+X = np.array(train_excerpt_df["text"])
+y = np.array(train_excerpt_df["author"])
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                    test_size=0.3,
+                                                    random_state=15,
+                                                    shuffle=True,
+                                                    stratify=y)
 
-plot_cm(confusion_matrix(y_dev, y_pred), list(np.unique(y_pred)))  # plot confusion matrix
+# Construct some pipelines
+pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
+                        ('cnb', ComplementNB())])
+
+pipe_tfidf_cnb = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('cnb', ComplementNB())])
+
+pipe_cv_knn = Pipeline([('cv', CountVectorizer()),
+                        ('knn', KNeighborsClassifier(metric='cosine'))])
+
+pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('knn', KNeighborsClassifier(metric='cosine'))])
+
+# Set grid search params
+grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "cnb__norm": [True, False]}]
+
+grid_params_tfidf_cnb = [{"tfidf__max_df": np.arange(0.8, 1, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "cnb__norm": [True, False]}]
+
+grid_params_cv_knn = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "knn__n_neighbors": np.arange(5, 31, 5),
+                       "knn__weights": ["uniform", "distance"]}]
+
+grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "knn__n_neighbors": np.arange(5, 31, 5),
+                          "knn__weights": ["uniform", "distance"]}]
+
+# Construct grid searches
+jobs = -1
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
+scoring = make_scorer(recall_score, average="macro")
+
+gs_cv_cnb = GridSearchCV(estimator=pipe_cv_cnb,
+                         param_grid=grid_params_cv_cnb,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_cnb = GridSearchCV(estimator=pipe_tfidf_cnb,
+                            param_grid=grid_params_tfidf_cnb,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_knn = GridSearchCV(estimator=pipe_cv_knn,
+                         param_grid=grid_params_cv_knn,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
+                            param_grid=grid_params_tfidf_knn,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+# List of pipelines for ease of iteration
+grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn]
+
+# Dictionary of pipelines and classifier types for ease of reference
+grid_labels = ['CountVectorizer, ComplementNB', 'TfidfVectorizer, ComplementNB',
+               'CountVectorizer, KNeighborsClassifier', 'TfidfVectorizer, KNeighborsClassifier']
+
+# Fit the grid search objects
+model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
+
+# Model Assessment
+# ----------------------------------------------------------------------------------------------------------------------
+print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
+evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
+                                                        output_dict=True))
+save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
+
+plot_cm(confusion_matrix(y_test, y_pred), list(np.unique(y_pred)))  # plot confusion matrix
 
 # Prediction
 # ----------------------------------------------------------------------------------------------------------------------
-# Predict the author in the test set
+# Predict the author in the submission set
 test_texts = clean(
-    test_df["text"],
+    submission_df["text"],
     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[',  '\\', ']', '^', '_',
                  '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
     stoppers=[".", "...", "!", "?"],
@@ -159,7 +240,7 @@ X_test = cv.transform(test_texts)
 predict_test = modelknn.predict(X_test)
 
 # Creating csv file with predictions
-submission = test_df
+submission = submission_df
 submission["prediction"] = predict_test
 submission.to_csv("./submission.csv", index=False)
 
