@@ -124,7 +124,7 @@ modelnaive = GaussianNB()
 
 X_train = X_train.toarray()
 modelnaive.fit(X_train, y_train)
-predict_dev = modelnaive.predict(X_dev)
+y_pred = modelnaive.predict(X_dev)
 
 # K-nearest neighbors
 modelknn = KNeighborsClassifier(n_neighbors=5,
@@ -136,14 +136,14 @@ modelknn = KNeighborsClassifier(n_neighbors=5,
                                 metric_params=None,
                                 n_jobs=1)
 modelknn.fit(X_train, y_train)
-predict_dev = modelknn.predict(X_dev)
+y_pred = modelknn.predict(X_dev)
 
 # Model evaluation
-print(classification_report(predict_dev, y_dev, target_names=list(np.unique(predict_dev))))
-evaluation_metrics = pd.DataFrame(classification_report(predict_dev, y_dev, target_names=list(np.unique(predict_dev)), output_dict=True))
+print(classification_report(y_dev, y_pred, target_names=list(np.unique(y_pred))))
+evaluation_metrics = pd.DataFrame(classification_report(y_dev, y_pred, target_names=list(np.unique(y_pred)), output_dict=True))
 save_excel(evaluation_metrics, 'NGRAM13_KNN5') # save the results in a excel file
 
-plot_cm(confusion_matrix(predict_dev, y_dev), list(np.unique(predict_dev)))  # plot confusion matrix
+plot_cm(confusion_matrix(y_dev, y_pred), list(np.unique(y_pred)))  # plot confusion matrix
 
 # Prediction
 # ----------------------------------------------------------------------------------------------------------------------
