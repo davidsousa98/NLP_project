@@ -5,12 +5,15 @@ import pandas as pd
 import re
 import nltk
 from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import RandomOverSampler
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.naive_bayes import ComplementNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, confusion_matrix, recall_score, make_scorer
 from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
 
 # nltk.download('rslp')
@@ -146,6 +149,12 @@ modelknn = KNeighborsClassifier(n_neighbors=5,
 modelknn.fit(X_train, y_train)
 y_pred = modelknn.predict(X_test)
 
+
+#Word2Vec
+# X_train = pd.DataFrame(X)
+# word2vec = Word2Vec(,min_count = 1, size = 100, window = 5)
+# y_pred = word2vec.predict(X_dev)
+
 # Logistic Regression
 log_reg = LogisticRegression(multi_class='multinomial', random_state=15).fit(X, y)
 y_pred = log_reg.predict(X_test)
@@ -276,3 +285,14 @@ submission.to_csv("./submission.csv", index=False)
 
 # Extras
 # ----------------------------------------------------------------------------------------------------------------------
+# POS Tagging
+# stok = nltk.data.load('tokenizers/punkt/portuguese.pickle')
+#
+# stok.tokenize(train_df["text"])
+#
+#  text = word_tokenize(test)
+# pos = nltk.corpus.mac_morpho.tagged_words()
+# nltk.corpus.mac_morpho.tagged_sents(text)
+
+# text.tagged_words()
+# X = pos.fit_transform(text)
