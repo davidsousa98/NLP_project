@@ -101,7 +101,7 @@ top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=1)
 
 # TF-IDF
 
-cv = TfidfVectorizer(max_df=0.9, stop_words=[".", "...", "!", "?"], ngram_range = (1,3))
+cv = TfidfVectorizer(max_df=0.8, stop_words=[".", "...", "!", "?"], ngram_range = (1,3))
 
 X = cv.fit_transform(train_excerpt_df["text"])
 
@@ -141,7 +141,8 @@ y_pred = modelknn.predict(X_dev)
 # Model evaluation
 print(classification_report(y_dev, y_pred, target_names=list(np.unique(y_pred))))
 evaluation_metrics = pd.DataFrame(classification_report(y_dev, y_pred, target_names=list(np.unique(y_pred)), output_dict=True))
-save_excel(evaluation_metrics, 'NGRAM13_KNN5') # save the results in a excel file
+save_excel(evaluation_metrics, 'tfidf80_ngram13_KNN5') # save the results in a excel file
+
 
 plot_cm(confusion_matrix(y_dev, y_pred), list(np.unique(y_pred)))  # plot confusion matrix
 

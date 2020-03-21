@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk import word_tokenize
 from sklearn.feature_extraction.text import CountVectorizer
+import os.path
 
 # import matplotlib
 # matplotlib.use('TkAgg')
@@ -229,7 +230,13 @@ def save_excel(dataframe, sheetname):
     :param sheetname: name of the sheet containing the parameterization.
 
     """
-    dataframe.to_excel('./metrics.xls', sheet_name=sheetname)
+    if os.path.isfile("./metrics.xlsx") == False:
+        mode = 'w'
+    else:
+        mode = 'a'
+    writer = pd.ExcelWriter('./metrics.xlsx', engine='openpyxl', mode=mode)
+    dataframe.to_excel(writer, sheet_name=sheetname)
+    writer.save()
 
 def get_top_n_grams(corpus, top_k, n):
     """
