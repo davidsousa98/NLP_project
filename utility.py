@@ -17,8 +17,8 @@ from sklearn.metrics import recall_score
 from sklearn.feature_extraction.text import CountVectorizer
 from joblib import dump
 
-# import matplotlib
-# matplotlib.use('TkAgg')
+import matplotlib
+matplotlib.use('TkAgg')
 
 def get_files_zip():
     """
@@ -198,10 +198,11 @@ def plot_cm(confusion_matrix: np.array, class_names: list):
             ax.text(j, i, confusion_matrix[i, j], ha="center", va="center", color="w")
 
     ax.set_title("Confusion Matrix")
-    plt.xlabel('Targets', fontweight='bold')
-    plt.ylabel('Predictions', fontweight='bold')
+    plt.ylabel('Targets', fontweight='bold')
+    plt.xlabel('Predictions', fontweight='bold')
     plt.ylim(top=len(class_names) - 0.5)  # adjust the top leaving bottom unchanged
     plt.ylim(bottom=-0.5)  # adjust the bottom leaving top unchanged
+    plt.tight_layout()
     return plt.show()
 
 

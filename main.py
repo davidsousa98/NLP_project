@@ -12,6 +12,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, confusion_matrix, recall_score, make_scorer
 from sklearn.pipeline import Pipeline
 
+
 # nltk.download('rslp')
 # nltk.download('punkt')
 
@@ -77,13 +78,36 @@ train_excerpt_df["word_count"].describe()  # word count mean is around 500
 # train_excerpt_df["author"].value_counts()/train_excerpt_df.shape[0]
 # train_df["author"].value_counts()/train_df.shape[0]
 
+# Train / Test split
+X_train, X_test, y_train, y_test = train_test_split(train_excerpt_df['text'],
+                                                    train_excerpt_df['author'],
+                                                    test_size=0.3,
+                                                    random_state=15,
+                                                    shuffle=True,
+                                                    stratify=train_excerpt_df['author'])
+
+# Oversampling
+X_temp = X_train.loc[(y_train == 'AlmadaNegreiros') | (y_train == 'LuisaMarquesSilva')].values.reshape(-1, 1)
+y_temp = y_train.loc[(y_train == 'AlmadaNegreiros') | (y_train == 'LuisaMarquesSilva')].values.reshape(-1, 1)
+
+author_weights = {"AlmadaNegreiros": 200, "LuisaMarquesSilva": 200}
+ros = RandomOverSampler(sampling_strategy=author_weights, random_state=15)
+X_res, y_res = ros.fit_resample(X_temp, y_temp)
+
+max_index = train_excerpt_df.index.max() + 1
+X_train = X_train.append(pd.Series(X_res.flatten(), index=pd.RangeIndex(start=max_index,
+                                                                        stop=max_index + sum(author_weights.values()))))
+y_train = y_train.append(pd.Series(y_res.flatten(), index=pd.RangeIndex(start=max_index,
+                                                                        stop=max_index + sum(author_weights.values()))))
+
 # Feature Engineering
 # ----------------------------------------------------------------------------------------------------------------------
 # Bag-of-words
 cv = CountVectorizer(max_df=0.9, binary=True, stop_words=[".", "...", "!", "?"])  # ignores terms with document
 # frequency above 0.9
-X = cv.fit_transform(train_excerpt_df["text"])
-y = np.array(train_excerpt_df["author"])
+X = cv.fit_transform(X_train)
+y = y_train
+X_test = cv.transform(X_test)
 
 # N-Gram
 cv = CountVectorizer(
@@ -92,29 +116,24 @@ cv = CountVectorizer(
     stop_words=[".", "...", "!", "?"],
     ngram_range=(1, 3)
 )
-X = cv.fit_transform(train_excerpt_df["text"])
-y = np.array(train_excerpt_df["author"])
+X = cv.fit_transform(X_train)
+y = y_train
+X_test = cv.transform(X_test)
 
-top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=1)
+top_df = get_top_n_grams(X_train, top_k=20, n=1)
 # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=2)
 # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=3)
 
 # TF-IDF
-cv = TfidfVectorizer(max_df=0.9, stop_words=[".", "...", "!", "?"], ngram_range=(1, 3))
-X = cv.fit_transform(train_excerpt_df["text"])
-y = np.array(train_excerpt_df["author"])
+cv = TfidfVectorizer(max_df=0.8, stop_words=[".", "...", "!", "?"], ngram_range = (1,3))
+X = cv.fit_transform(X_train)
+y = y_train
+X_test = cv.transform(X_test)
 
 feature_names = cv.get_feature_names()
 
 # Model
 # ----------------------------------------------------------------------------------------------------------------------
-# Train / Test split
-X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                    test_size=0.3,
-                                                    random_state=15,
-                                                    shuffle=True,
-                                                    stratify=y)
-
 #Naive Bayes Classifier
 modelnaive = ComplementNB()  # ComplementNB appropriate for text data and imbalanced classes
 modelnaive.fit(X_train, y_train)
@@ -126,6 +145,17 @@ modelknn = KNeighborsClassifier(n_neighbors=5,
                                 metric='cosine')
 modelknn.fit(X_train, y_train)
 y_pred = modelknn.predict(X_test)
+
+# Logistic Regression
+log_reg = LogisticRegression(multi_class='multinomial', random_state=15).fit(X, y)
+y_pred = log_reg.predict(X_test)
+
+# Random Forest Classifier
+rfc = RandomForestClassifier(class_weight='balanced', random_state=15).fit(X, y)
+y_pred = rfc.predict(X_test)
+
+unique, counts = np.unique(y_pred, return_counts=True)
+print(np.asarray((unique, counts)).T)
 
 # Model Selection
 # ----------------------------------------------------------------------------------------------------------------------
