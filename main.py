@@ -222,8 +222,7 @@ grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
 # Construct grid searches
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
-scoring = {'recall': make_scorer(recall_score, average="macro"),
-           'accuracy': make_scorer(accuracy_score)}
+scoring = make_scorer(recall_score, average="macro")
 
 gs_cv_cnb = GridSearchCV(estimator=pipe_cv_cnb,
                          param_grid=grid_params_cv_cnb,
@@ -261,6 +260,8 @@ model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
 
 # Model Assessment
 # ----------------------------------------------------------------------------------------------------------------------
+# See reference:
+# https://scikit-learn.org/stable/auto_examples/model_selection/plot_multi_metric_evaluation.html#sphx-glr-auto-examples-model-selection-plot-multi-metric-evaluation-py
 print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
 evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
                                                         output_dict=True))
