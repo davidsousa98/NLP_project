@@ -22,7 +22,9 @@ from sklearn.ensemble import RandomForestClassifier
 
 # TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
 # TODO: Perform POS tagging (Viterbi algorithm). 1) filter out unnecessary tags; 2) count the number of each tag
+# TODO: Build bar plot with bar for each best_model. height = mean_test_score, interval = std_test_score
 # TODO: Perform ensemble on best models
+
 
 # Building Corpus
 # ----------------------------------------------------------------------------------------------------------------------
@@ -314,11 +316,11 @@ grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn]
 # , gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ['CountVectorizer, ComplementNB', 'TfidfVectorizer, ComplementNB',
-               'CountVectorizer, KNeighborsClassifier']
-# , 'TfidfVectorizer, KNeighborsClassifier',
-# 'CountVectorizer, LogisticRegression', 'TfidfVectorizer, LogisticRegression',
-# 'CountVectorizer, RandomForestClassifier', 'TfidfVectorizer, RandomForestClassifier']
+grid_labels = ['CountVectorizer_ComplementNB', 'TfidfVectorizer_ComplementNB',
+               'CountVectorizer_KNeighborsClassifier']
+# , 'TfidfVectorizer_KNeighborsClassifier',
+# 'CountVectorizer_LogisticRegression', 'TfidfVectorizer_LogisticRegression',
+# 'CountVectorizer_RandomForestClassifier', 'TfidfVectorizer_RandomForestClassifier']
 
 # Fit the grid search objects
 model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)

@@ -3,6 +3,7 @@ import zipfile as zp
 import io
 import requests
 import unicodedata
+from openpyxl import load_workbook
 # from tqdm import tqdm_notebook as tqdm
 import itertools
 import numpy as np
@@ -288,7 +289,7 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
     """
         Function receives a list of GridSearch objects and fits them to the data. Returns the best parameters in each
         grid together with the respective macro recall score. Writes and excel file with information on the best
-        parameters for each Pipeline and exports the best 3 Pipelines as pickle files.
+        parameters for each Pipeline and exports the Pipelines to pickle files.
 
         :param grids: list of GridSearch objects
         :param X_train: X train
@@ -299,10 +300,12 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
 
         """
     print('Performing model optimizations...')
-    scores = []
-    fitted_pipelines = []
     for gs, label in zip(grids, grid_labels):
         print('\nEstimator: %s' % label)
+        wb = load_workbook("./outputs/Pipelines.xlsx", read_only=True)
+        if label in wb.sheetnames:
+            print('Grid already fitted. Continue to next grid.')
+            continue
         # Fit grid search
         gs.fit(X_train, y_train)
         # Best params
@@ -313,23 +316,10 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         y_pred = gs.predict(X_test)
         # Test data score of model with best params
         print('Test set score for best params: %.3f ' % recall_score(y_test, y_pred, average="macro"))
-        # Save test scores for Pipeline Summary
-        scores.append(recall_score(y_test, y_pred, average="macro"))
-        # Save fitted pipeline object for exporting pickle ahead
-        fitted_pipelines.append(gs)
         # Save Pipeline name and best parameters to excel
-        # best_params = pd.DataFrame({k: str(v) for (k, v) in gs.best_params_.items()}, index=[label])
         grid_results = pd.DataFrame(gs.cv_results_)
         grid_results["best_index"] = pd.Series(np.zeros(grid_results.shape[0]))
         grid_results.loc[gs.best_index_, "best_index"] = 1
         save_excel(grid_results, label, "Pipelines")
-    # Save Pipeline Summary to excel
-    pipeline_summary = pd.DataFrame({"Pipeline": grid_labels, "Score": scores})
-    save_excel(pipeline_summary, "Pipelines_Summary", "Pipelines")
-    print('\nPipeline with best test set score: %s'
-          % pipeline_summary.loc[pipeline_summary["Score"] == pipeline_summary["Score"].max(), "Pipeline"])
-    # Save top 3 grid search pipeline to pickle
-    for top, i in enumerate(np.array(scores).argsort()[-3:][::-1]):
-        dump_file = 'best_gs_pipeline{}.pkl'.format(top)
-        dump(fitted_pipelines[i], "./outputs/{}".format(dump_file), compress=1)
-        print('\nSaved %s grid search pipeline to: %s' % (grid_labels[i], "./outputs/{}".format(dump_file)))
+        # Save fitted grid to pickle file
+        dump(gs, "./outputs/Pipeline_{}.pkl".format(label), compress=1)
