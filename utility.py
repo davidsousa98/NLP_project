@@ -321,7 +321,7 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         # best_params = pd.DataFrame({k: str(v) for (k, v) in gs.best_params_.items()}, index=[label])
         grid_results = pd.DataFrame(gs.cv_results_)
         grid_results["best_index"] = pd.Series(np.zeros(grid_results.shape[0]))
-        grid_results["best_index"][gs.best_index_] = 1
+        grid_results.loc[gs.best_index_, "best_index"] = 1
         save_excel(grid_results, label, "Pipelines")
     # Save Pipeline Summary to excel
     pipeline_summary = pd.DataFrame({"Pipeline": grid_labels, "Score": scores})
