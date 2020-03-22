@@ -12,7 +12,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, confusion_matrix, recall_score, make_scorer
+from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -193,26 +193,26 @@ pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
                            ('knn', KNeighborsClassifier(metric='cosine'))])
 
 # Set grid search params
-grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1, 0.05),
+grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
                        "cnb__norm": [True, False]}]
 
-grid_params_tfidf_cnb = [{"tfidf__max_df": np.arange(0.8, 1, 0.05),
+grid_params_tfidf_cnb = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
                           "cnb__norm": [True, False]}]
 
-grid_params_cv_knn = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+grid_params_cv_knn = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
                        "knn__n_neighbors": np.arange(5, 31, 5),
                        "knn__weights": ["uniform", "distance"]}]
 
-grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
@@ -222,7 +222,8 @@ grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
 # Construct grid searches
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
-scoring = make_scorer(recall_score, average="macro")
+scoring = {'recall': make_scorer(recall_score, average="macro"),
+           'accuracy': make_scorer(accuracy_score)}
 
 gs_cv_cnb = GridSearchCV(estimator=pipe_cv_cnb,
                          param_grid=grid_params_cv_cnb,

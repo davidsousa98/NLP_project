@@ -13,12 +13,12 @@ from string import punctuation as punct
 from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk import word_tokenize
-from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score, accuracy_score
 from sklearn.feature_extraction.text import CountVectorizer
 from joblib import dump
 
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 def get_files_zip():
     """
@@ -299,7 +299,8 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
 
         """
     print('Performing model optimizations...')
-    scores = []
+    recalls = []
+    accuracies = []
     fitted_pipelines = []
     for gs, label in zip(grids, grid_labels):
         print('\nEstimator: %s' % label)
@@ -312,21 +313,24 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         # Predict on test data with best params
         y_pred = gs.predict(X_test)
         # Test data score of model with best params
-        print('Test set score for best params: %.3f ' % recall_score(y_test, y_pred, average="macro"))
+        print('Test set recall for best params: %.3f ' % recall_score(y_test, y_pred, average="macro"))
+        # Test data score of model with best params
+        print('Test set accuracy for best params: %.3f ' % accuracy_score(y_test, y_pred))
         # Save test scores for Pipeline Summary
-        scores.append(recall_score(y_test, y_pred, average="macro"))
+        recalls.append(recall_score(y_test, y_pred, average="macro"))
+        accuracies.append(accuracy_score(y_test, y_pred))
         # Save fitted pipeline object for exporting pickle ahead
         fitted_pipelines.append(gs)
         # Save Pipeline name and best parameters to excel
         best_params = pd.DataFrame({k: str(v) for (k, v) in gs.best_params_.items()}, index=[label])
         save_excel(best_params, label, "Pipelines")
     # Save Pipeline Summary to excel
-    pipeline_summary = pd.DataFrame({"Pipeline": grid_labels, "Score": scores})
+    pipeline_summary = pd.DataFrame({"Pipeline": grid_labels, "Recall": recalls, "Accuracy": accuracies})
     save_excel(pipeline_summary, "Pipeline_Summary", "Pipelines")
     print('\nPipeline with best test set score: %s'
           % pipeline_summary.loc[pipeline_summary["Score"] == pipeline_summary["Score"].max(), "Pipeline"])
     # Save top 3 grid search pipeline to pickle
-    for top, i in enumerate(np.array(scores).argsort()[-3:][::-1]):
+    for top, i in enumerate(np.array(recalls).argsort()[-3:][::-1]):
         dump_file = 'best_gs_pipeline{}.pkl'.format(top)
         dump(fitted_pipelines[i], dump_file, compress=1)
         print('\nSaved %s grid search pipeline to file: %s' % (grid_labels[i], dump_file))

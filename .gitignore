@@ -1,7 +1,7 @@
 # User defined
 .idea/
 submission.csv
-outputs/
+outputs/*
 #nlp_data.zip
 
 # Byte-compiled / optimized / DLL files
