@@ -1,5 +1,6 @@
 from utility import get_files_zip, read_txt_zip, clean, update_df, sample_excerpts, plot_cm, word_counter, save_excel, \
     get_top_n_grams, model_selection
+from joblib import load
 import numpy as np
 import pandas as pd
 import re
@@ -325,10 +326,25 @@ grid_labels = ['CountVectorizer_ComplementNB', 'TfidfVectorizer_ComplementNB',
 # Fit the grid search objects
 model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
 
+# Load pickle files with fitted models
+gs_cv_cnb = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
+gs_tfidf_cnb = load("./outputs/Pipeline_TfidfVectorizer_ComplementNB.pkl")
+gs_cv_knn = load("./outputs/Pipeline_CountVectorizer_KNeighborsClassifier.pkl")
+# gs_tfidf_knn = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
+# gs_cv_log = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
+# gs_tfidf_log = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
+# gs_cv_rfc = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
+# gs_tfidf_rfc = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
+
+# Ensemble
+
+
 # Model Assessment
 # ----------------------------------------------------------------------------------------------------------------------
 # See reference:
 # https://scikit-learn.org/stable/auto_examples/model_selection/plot_multi_metric_evaluation.html#sphx-glr-auto-examples-model-selection-plot-multi-metric-evaluation-py
+y_pred = gs_cv_knn.predict(X_test)
+
 print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
 evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
                                                         output_dict=True))
