@@ -237,7 +237,7 @@ grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
                        "log__penalty": ["l1","l2"],
                        "log__C": np.logspace(-3,3,7),
-                       "log__solver": ["sag","saga"]}]
+                       "log__solver": ["lbfgs","sag","saga"]}]
 
 grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
@@ -245,7 +245,7 @@ grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
                           "log__penalty": ["l1","l2"],
                           "log__C": np.logspace(-3,3,7),
-                          "log__solver": ["sag","saga"]}]
+                          "log__solver": ["lbfgs","sag","saga"]}]
 
 grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
