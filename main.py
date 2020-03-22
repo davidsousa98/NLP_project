@@ -220,7 +220,7 @@ grid_params_cv_knn = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
                        "knn__n_neighbors": np.arange(5, 31, 5),
-                       "log__C": ["uniform", "distance"]}]
+                       "knn__weights": ["uniform", "distance"]}]
 
 # grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
 #                           "tfidf__binary": [True, False],
