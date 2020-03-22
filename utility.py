@@ -302,10 +302,11 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
     print('Performing model optimizations...')
     for gs, label in zip(grids, grid_labels):
         print('\nEstimator: %s' % label)
-        wb = load_workbook("./outputs/Pipelines.xlsx", read_only=True)
-        if label in wb.sheetnames:
-            print('Grid already fitted. Continue to next grid.')
-            continue
+        if os.path.isfile("./outputs/Pipelines.xlsx"):
+            wb = load_workbook("./outputs/Pipelines.xlsx", read_only=True)
+            if label in wb.sheetnames:
+                print('Grid already fitted. Continue to next grid.')
+                continue
         # Fit grid search
         gs.fit(X_train, y_train)
         # Best params
