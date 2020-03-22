@@ -331,5 +331,5 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
     # Save top 3 grid search pipeline to pickle
     for top, i in enumerate(np.array(scores).argsort()[-3:][::-1]):
         dump_file = 'best_gs_pipeline{}.pkl'.format(top)
-        dump(fitted_pipelines[i], dump_file, compress=1)
-        print('\nSaved %s grid search pipeline to file: %s' % (grid_labels[i], dump_file))
+        dump(fitted_pipelines[i], "./outputs/{}".format(dump_file), compress=1)
+        print('\nSaved %s grid search pipeline to: %s' % (grid_labels[i], "./outputs/{}".format(dump_file)))
