@@ -141,14 +141,14 @@ feature_names = cv.get_feature_names()
 # ----------------------------------------------------------------------------------------------------------------------
 #Naive Bayes Classifier
 modelnaive = ComplementNB()  # ComplementNB appropriate for text data and imbalanced classes
-modelnaive.fit(X_train, y_train)
+modelnaive.fit(X, y_train)
 y_pred = modelnaive.predict(X_test)
 
 # K-nearest neighbors
 modelknn = KNeighborsClassifier(n_neighbors=5,
                                 weights='distance',
                                 metric='cosine')
-modelknn.fit(X_train, y_train)
+modelknn.fit(X, y_train)
 y_pred = modelknn.predict(X_test)
 
 
@@ -192,6 +192,12 @@ pipe_cv_knn = Pipeline([('cv', CountVectorizer()),
 pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
                            ('knn', KNeighborsClassifier(metric='cosine'))])
 
+pipe_cv_log = Pipeline([('cv', CountVectorizer()),
+                        ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
+
+pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
+
 # Set grid search params
 grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1, 0.05),
                        "cv__binary": [True, False],
@@ -210,7 +216,7 @@ grid_params_cv_knn = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
                        "knn__n_neighbors": np.arange(5, 31, 5),
-                       "knn__weights": ["uniform", "distance"]}]
+                       "log__C": ["uniform", "distance"]}]
 
 grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
@@ -219,6 +225,21 @@ grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "knn__n_neighbors": np.arange(5, 31, 5),
                           "knn__weights": ["uniform", "distance"]}]
 
+grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "log__penalty": ["l1","l2"],
+                       "log__C": np.logspace(-3,3,7),
+                       "log__solver": ["sag","saga"]}]
+
+grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "log__penalty": ["l1","l2"],
+                          "log__C": np.logspace(-3,3,7),
+                          "log__solver": ["sag","saga"]}]
 # Construct grid searches
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
@@ -247,6 +268,19 @@ gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
                             scoring=scoring,
                             cv=cv,
                             n_jobs=jobs)
+
+gs_cv_log = GridSearchCV(estimator=pipe_cv_log,
+                         param_grid=grid_params_cv_log,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_log = GridSearchCV(estimator=pipe_tfidf_log,
+                            param_grid=grid_params_tfidf_log,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
 
 # List of pipelines for ease of iteration
 grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn]
