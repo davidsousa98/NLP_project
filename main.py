@@ -16,6 +16,7 @@ from sklearn.metrics import classification_report, confusion_matrix, recall_scor
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import SGDClassifier
 
 # nltk.download('rslp')
 # nltk.download('punkt')
@@ -189,20 +190,20 @@ pipe_tfidf_cnb = Pipeline([('tfidf', TfidfVectorizer()),
 pipe_cv_knn = Pipeline([('cv', CountVectorizer()),
                         ('knn', KNeighborsClassifier(metric='cosine'))])
 
-# pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('knn', KNeighborsClassifier(metric='cosine'))])
-#
-# pipe_cv_log = Pipeline([('cv', CountVectorizer()),
-#                         ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
-#
-# pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
-#
-# pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
-#                         ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
-#
-# pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
+pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('knn', KNeighborsClassifier(metric='cosine'))])
+
+pipe_cv_log = Pipeline([('cv', CountVectorizer()),
+                        ('log', SGDClassifier(loss='log', random_state=15))])
+
+pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('log', SGDClassifier(loss='log', random_state=15))])
+
+pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
+                        ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
+
+pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
 # Set grid search params
 grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
@@ -224,40 +225,38 @@ grid_params_cv_knn = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "knn__n_neighbors": np.arange(5, 31, 5),
                        "knn__weights": ["uniform", "distance"]}]
 
-# grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
-#                           "tfidf__binary": [True, False],
-#                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                           "knn__n_neighbors": np.arange(5, 31, 5),
-#                           "knn__weights": ["uniform", "distance"]}]
-#
-# grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-#                        "cv__binary": [True, False],
-#                        "cv__stop_words": [[".", "...", "!", "?"], None],
-#                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                        "log__penalty": ["l1", "l2"],
-#                        "log__C": np.logspace(-3, 3, 7),
-#                        "log__solver": ["lbfgs", "sag", "saga"]}]
-#
-# grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-#                           "tfidf__binary": [True, False],
-#                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                           "log__penalty": ["l1", "l2"],
-#                           "log__C": np.logspace(-3, 3, 7),
-#                           "log__solver": ["lbfgs", "sag", "saga"]}]
-#
-# grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-#                        "cv__binary": [True, False],
-#                        "cv__stop_words": [[".", "...", "!", "?"], None],
-#                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                        "rfc__n_estimators": np.arange(100, 600, 100)}]
-#
-# grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-#                           "tfidf__binary": [True, False],
-#                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                           "rfc__n_estimators": np.arange(100, 600, 100)}]
+grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "knn__n_neighbors": np.arange(5, 31, 5),
+                          "knn__weights": ["uniform", "distance"]}]
+
+grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "log__penalty": ['l1','l2'],
+                       "log__alpha": np.logspace(-3, 3, 7)}]
+
+grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "log__penalty": ['l1','l2'],
+                          "log__alpha": np.logspace(-3, 3, 7)}]
+
+grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "rfc__n_estimators": np.arange(100, 600, 100)}]
+
+grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "rfc__n_estimators": np.arange(100, 600, 100)}]
 # Construct grid searches
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
@@ -281,78 +280,70 @@ gs_cv_knn = GridSearchCV(estimator=pipe_cv_knn,
                          cv=cv,
                          n_jobs=jobs)
 
-# gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
-#                             param_grid=grid_params_tfidf_knn,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
-#
-# gs_cv_log = GridSearchCV(estimator=pipe_cv_log,
-#                          param_grid=grid_params_cv_log,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_log = GridSearchCV(estimator=pipe_tfidf_log,
-#                             param_grid=grid_params_tfidf_log,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
-#
-# gs_cv_rfc = GridSearchCV(estimator=pipe_cv_rfc,
-#                          param_grid=grid_params_cv_rfc,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_rfc = GridSearchCV(estimator=pipe_tfidf_rfc,
-#                             param_grid=grid_params_tfidf_rfc,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
+gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
+                            param_grid=grid_params_tfidf_knn,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_log = GridSearchCV(estimator=pipe_cv_log,
+                         param_grid=grid_params_cv_log,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_log = GridSearchCV(estimator=pipe_tfidf_log,
+                            param_grid=grid_params_tfidf_log,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_rfc = GridSearchCV(estimator=pipe_cv_rfc,
+                         param_grid=grid_params_cv_rfc,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_rfc = GridSearchCV(estimator=pipe_tfidf_rfc,
+                            param_grid=grid_params_tfidf_rfc,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
 
 # List of pipelines for ease of iteration
-grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn]
-# , gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
+grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ['CountVectorizer_ComplementNB', 'TfidfVectorizer_ComplementNB',
-               'CountVectorizer_KNeighborsClassifier']
-# , 'TfidfVectorizer_KNeighborsClassifier',
-# 'CountVectorizer_LogisticRegression', 'TfidfVectorizer_LogisticRegression',
-# 'CountVectorizer_RandomForestClassifier', 'TfidfVectorizer_RandomForestClassifier']
-
-# Fit the grid search objects
-model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
-
-# Model Assessment
-# ----------------------------------------------------------------------------------------------------------------------
-# See reference:
-# https://scikit-learn.org/stable/auto_examples/model_selection/plot_multi_metric_evaluation.html#sphx-glr-auto-examples-model-selection-plot-multi-metric-evaluation-py
-print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
-evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
-                                                        output_dict=True))
-save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
-
-plot_cm(confusion_matrix(y_test, y_pred), list(np.unique(y_pred)))  # plot confusion matrix
-
-# Prediction
-# ----------------------------------------------------------------------------------------------------------------------
-# Predict the author in the submission set
-test_texts = clean(
-    submission_df["text"],
-    punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_',
-                 '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
-    stoppers=[".", "...", "!", "?"],
-    stemmer=nltk.stem.SnowballStemmer('portuguese')
-)
-X_test = cv.transform(test_texts)
-predict_test = modelknn.predict(X_test)
-
-# Creating csv file with predictions
-submission = submission_df
-submission["prediction"] = predict_test
-submission.to_csv("./outputs/submission.csv", index=False)
+grid_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc']
+#
+# # Model Assessment
+# # ----------------------------------------------------------------------------------------------------------------------
+# # See reference:
+# # https://scikit-learn.org/stable/auto_examples/model_selection/plot_multi_metric_evaluation.html#sphx-glr-auto-examples-model-selection-plot-multi-metric-evaluation-py
+# print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
+# evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
+#                                                         output_dict=True))
+# save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
+#
+# plot_cm(confusion_matrix(y_test, y_pred), list(np.unique(y_pred)))  # plot confusion matrix
+#
+# # Prediction
+# # ----------------------------------------------------------------------------------------------------------------------
+# # Predict the author in the submission set
+# test_texts = clean(
+#     submission_df["text"],
+#     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_',
+#                  '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
+#     stoppers=[".", "...", "!", "?"],
+#     stemmer=nltk.stem.SnowballStemmer('portuguese')
+# )
+# X_test = cv.transform(test_texts)
+# predict_test = modelknn.predict(X_test)
+#
+# # Creating csv file with predictions
+# submission = submission_df
+# submission["prediction"] = predict_test
+# submission.to_csv("./outputs/submission.csv", index=False)
 
 # Extras
 # ----------------------------------------------------------------------------------------------------------------------
