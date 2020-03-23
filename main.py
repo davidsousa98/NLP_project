@@ -17,6 +17,7 @@ from sklearn.metrics import classification_report, confusion_matrix, recall_scor
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import SGDClassifier
 
 # nltk.download('rslp')
 # nltk.download('punkt')
@@ -193,11 +194,11 @@ pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
                            ('knn', KNeighborsClassifier(metric='cosine'))])
 
 pipe_cv_log = Pipeline([('cv', CountVectorizer()),
-                        ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
+                        ('log', SGDClassifier(loss='log', random_state=15))])
 
 pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
-                           ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
-#
+                           ('log', SGDClassifier(loss='log', random_state=15))])
+
 pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
                         ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
@@ -235,18 +236,16 @@ grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                       "log__penalty": ["l1", "l2"],
-                       "log__C": np.logspace(-3, 3, 7),
-                       "log__solver": ["lbfgs", "sag", "saga"]}]
+                       "log__penalty": ['l1','l2'],
+                       "log__alpha": np.logspace(-3, 3, 7)}]
 
 grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                          "log__penalty": ["l1", "l2"],
-                          "log__C": np.logspace(-3, 3, 7),
-                          "log__solver": ["lbfgs", "sag", "saga"]}]
-#
+                          "log__penalty": ['l1','l2'],
+                          "log__alpha": np.logspace(-3, 3, 7)}]
+
 grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
@@ -318,9 +317,6 @@ grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_l
 grid_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc']
 
 
-# Fit the grid search objects
-model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
-
 # Load pickle files with fitted models
 gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
 gs_tfidf_cnb = load("./outputs/Pipeline_tfidf_cnb.pkl")
@@ -345,25 +341,23 @@ evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_n
                                                         output_dict=True))
 save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
 
-plot_cm(confusion_matrix(y_test, y_pred), list(np.unique(y_pred)))  # plot confusion matrix
-
-# Prediction
-# ----------------------------------------------------------------------------------------------------------------------
-# Predict the author in the submission set
-test_texts = clean(
-    submission_df["text"],
-    punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_',
-                 '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
-    stoppers=[".", "...", "!", "?"],
-    stemmer=nltk.stem.SnowballStemmer('portuguese')
-)
-X_test = cv.transform(test_texts)
-predict_test = modelknn.predict(X_test)
-
-# Creating csv file with predictions
-submission = submission_df
-submission["prediction"] = predict_test
-submission.to_csv("./outputs/submission.csv", index=False)
+# # Prediction
+# # ----------------------------------------------------------------------------------------------------------------------
+# # Predict the author in the submission set
+# test_texts = clean(
+#     submission_df["text"],
+#     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_',
+#                  '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
+#     stoppers=[".", "...", "!", "?"],
+#     stemmer=nltk.stem.SnowballStemmer('portuguese')
+# )
+# X_test = cv.transform(test_texts)
+# predict_test = modelknn.predict(X_test)
+#
+# # Creating csv file with predictions
+# submission = submission_df
+# submission["prediction"] = predict_test
+# submission.to_csv("./outputs/submission.csv", index=False)
 
 # Extras
 # ----------------------------------------------------------------------------------------------------------------------
