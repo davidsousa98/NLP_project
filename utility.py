@@ -324,3 +324,4 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         save_excel(grid_results, label, "Pipelines")
         # Save fitted grid to pickle file
         dump(gs, "./outputs/Pipeline_{}.pkl".format(label), compress=1)
+    print("Model Selection process finished")

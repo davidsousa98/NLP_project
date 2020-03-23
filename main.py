@@ -22,7 +22,6 @@ from sklearn.ensemble import RandomForestClassifier
 # nltk.download('punkt')
 
 # TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
-# TODO: Perform POS tagging (Viterbi algorithm). 1) filter out unnecessary tags; 2) count the number of each tag
 # TODO: Build bar plot with bar for each best_model. height = mean_test_score, interval = std_test_score
 # TODO: Perform ensemble on best models
 
@@ -190,20 +189,20 @@ pipe_tfidf_cnb = Pipeline([('tfidf', TfidfVectorizer()),
 pipe_cv_knn = Pipeline([('cv', CountVectorizer()),
                         ('knn', KNeighborsClassifier(metric='cosine'))])
 
-# pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('knn', KNeighborsClassifier(metric='cosine'))])
+pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('knn', KNeighborsClassifier(metric='cosine'))])
+
+pipe_cv_log = Pipeline([('cv', CountVectorizer()),
+                        ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
+
+pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
 #
-# pipe_cv_log = Pipeline([('cv', CountVectorizer()),
-#                         ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
-#
-# pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('log', LogisticRegression(multi_class='multinomial', random_state=15))])
-#
-# pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
-#                         ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
-#
-# pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
+pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
+                        ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
+
+pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
 # Set grid search params
 grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
@@ -225,40 +224,40 @@ grid_params_cv_knn = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "knn__n_neighbors": np.arange(5, 31, 5),
                        "knn__weights": ["uniform", "distance"]}]
 
-# grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
-#                           "tfidf__binary": [True, False],
-#                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                           "knn__n_neighbors": np.arange(5, 31, 5),
-#                           "knn__weights": ["uniform", "distance"]}]
+grid_params_tfidf_knn = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "knn__n_neighbors": np.arange(5, 31, 5),
+                          "knn__weights": ["uniform", "distance"]}]
+
+grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "log__penalty": ["l1", "l2"],
+                       "log__C": np.logspace(-3, 3, 7),
+                       "log__solver": ["lbfgs", "sag", "saga"]}]
+
+grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "log__penalty": ["l1", "l2"],
+                          "log__C": np.logspace(-3, 3, 7),
+                          "log__solver": ["lbfgs", "sag", "saga"]}]
 #
-# grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-#                        "cv__binary": [True, False],
-#                        "cv__stop_words": [[".", "...", "!", "?"], None],
-#                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                        "log__penalty": ["l1", "l2"],
-#                        "log__C": np.logspace(-3, 3, 7),
-#                        "log__solver": ["lbfgs", "sag", "saga"]}]
-#
-# grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-#                           "tfidf__binary": [True, False],
-#                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                           "log__penalty": ["l1", "l2"],
-#                           "log__C": np.logspace(-3, 3, 7),
-#                           "log__solver": ["lbfgs", "sag", "saga"]}]
-#
-# grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-#                        "cv__binary": [True, False],
-#                        "cv__stop_words": [[".", "...", "!", "?"], None],
-#                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                        "rfc__n_estimators": np.arange(100, 600, 100)}]
-#
-# grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-#                           "tfidf__binary": [True, False],
-#                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                           "rfc__n_estimators": np.arange(100, 600, 100)}]
+grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "rfc__n_estimators": np.arange(100, 600, 100)}]
+
+grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "rfc__n_estimators": np.arange(100, 600, 100)}]
 # Construct grid searches
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
@@ -282,59 +281,55 @@ gs_cv_knn = GridSearchCV(estimator=pipe_cv_knn,
                          cv=cv,
                          n_jobs=jobs)
 
-# gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
-#                             param_grid=grid_params_tfidf_knn,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
-#
-# gs_cv_log = GridSearchCV(estimator=pipe_cv_log,
-#                          param_grid=grid_params_cv_log,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_log = GridSearchCV(estimator=pipe_tfidf_log,
-#                             param_grid=grid_params_tfidf_log,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
-#
-# gs_cv_rfc = GridSearchCV(estimator=pipe_cv_rfc,
-#                          param_grid=grid_params_cv_rfc,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_rfc = GridSearchCV(estimator=pipe_tfidf_rfc,
-#                             param_grid=grid_params_tfidf_rfc,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
+gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
+                            param_grid=grid_params_tfidf_knn,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_log = GridSearchCV(estimator=pipe_cv_log,
+                         param_grid=grid_params_cv_log,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_log = GridSearchCV(estimator=pipe_tfidf_log,
+                            param_grid=grid_params_tfidf_log,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_rfc = GridSearchCV(estimator=pipe_cv_rfc,
+                         param_grid=grid_params_cv_rfc,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_rfc = GridSearchCV(estimator=pipe_tfidf_rfc,
+                            param_grid=grid_params_tfidf_rfc,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
 
 # List of pipelines for ease of iteration
-grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn]
-# , gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
+grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ['CountVectorizer_ComplementNB', 'TfidfVectorizer_ComplementNB',
-               'CountVectorizer_KNeighborsClassifier']
-# , 'TfidfVectorizer_KNeighborsClassifier',
-# 'CountVectorizer_LogisticRegression', 'TfidfVectorizer_LogisticRegression',
-# 'CountVectorizer_RandomForestClassifier', 'TfidfVectorizer_RandomForestClassifier']
+grid_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc']
+
 
 # Fit the grid search objects
 model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
 
 # Load pickle files with fitted models
-gs_cv_cnb = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
-gs_tfidf_cnb = load("./outputs/Pipeline_TfidfVectorizer_ComplementNB.pkl")
-gs_cv_knn = load("./outputs/Pipeline_CountVectorizer_KNeighborsClassifier.pkl")
-# gs_tfidf_knn = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
-# gs_cv_log = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
-# gs_tfidf_log = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
-# gs_cv_rfc = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
-# gs_tfidf_rfc = load("./outputs/Pipeline_CountVectorizer_ComplementNB.pkl")
+gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
+gs_tfidf_cnb = load("./outputs/Pipeline_tfidf_cnb.pkl")
+gs_cv_knn = load("./outputs/Pipeline_cv_knn.pkl")
+gs_tfidf_knn = load("./outputs/Pipeline_tfidf_knn.pkl")
+gs_cv_log = load("./outputs/Pipeline_cv_log.pkl")
+gs_tfidf_log = load("./outputs/Pipeline_tfidf_log.pkl")
+gs_cv_rfc = load("./outputs/Pipeline_cv_rfc.pkl")
+gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
 
 # Ensemble
 
