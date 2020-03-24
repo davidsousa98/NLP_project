@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('TkAgg')
+
 import os
 import zipfile as zp
 import io
@@ -21,8 +24,6 @@ from joblib import dump
 import plotly.graph_objects as go
 import plotly.offline as pyo
 
-import matplotlib
-# matplotlib.use('TkAgg')
 
 def get_files_zip():
     """
