@@ -12,9 +12,6 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.naive_bayes import ComplementNB
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import SGDClassifier
 from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.neighbors import NearestCentroid
 from sklearn.linear_model import SGDClassifier
@@ -273,13 +270,13 @@ grid_params_cv_knc = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                       "knc__metric": ["euclidean","manhattan"]}]
+                       "knc__metric": ["euclidean", "manhattan"]}]
 
 grid_params_tfidf_knc = [{"tfidf__max_df": np.arange(0.8, 1.01, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                          "knc__metric": ["euclidean","manhattan"]}]
+                          "knc__metric": ["euclidean", "manhattan"]}]
 
 grid_params_cv_log = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
@@ -299,8 +296,8 @@ grid_params_cv_sgd = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                       "sgd__penalty": ['l2','elasticnet'],
-                       "sgd__loss:": ["modified_huber", "squared_hinge","perceptron"]}]
+                       "sgd__penalty": ['l2', 'elasticnet'],
+                       "sgd__loss:": ["modified_huber", "squared_hinge", "perceptron"]}]
 
 grid_params_tfidf_sgd = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
@@ -322,32 +319,17 @@ grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
                           "rfc__n_estimators": np.arange(100, 600, 100)}]
 
-grid_params_cv_pac = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-                       "cv__binary": [True, False],
-                       "cv__stop_words": [[".", "...", "!", "?"], None],
-                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                       "pac__early_stopping": [False, True],
-                       "pac__warm_start": [False, True]}]
-
-grid_params_tfidf_pac = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-                          "tfidf__binary": [True, False],
-                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
-                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                          "pac__early_stopping": [False, True],
-                          "pac__warm_start": [False, True]}]
-
-
 grid_params_cv_lsvc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                         "cv__binary": [True, False],
                         "cv__stop_words": [[".", "...", "!", "?"], None],
                         "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                        }]
+                        }]  # Missing parameters
 
 grid_params_tfidf_lsvc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                            "tfidf__binary": [True, False],
                            "tfidf__stop_words": [[".", "...", "!", "?"], None],
                            "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                           }]
+                           }]  # Missing parameters
 
 grid_params_cv_mlpc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                         "cv__binary": [True, False],
@@ -368,6 +350,20 @@ grid_params_tfidf_mlpc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                            'mlpc__solver': ['sgd', 'adam'],
                            'mlpc__alpha': [0.0001, 0.05],
                            'mlpc__learning_rate': ['constant', 'adaptive']}]
+
+grid_params_cv_pac = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "pac__early_stopping": [False, True],
+                       "pac__warm_start": [False, True]}]
+
+grid_params_tfidf_pac = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "pac__early_stopping": [False, True],
+                          "pac__warm_start": [False, True]}]
 
 # Construct grid searches
 jobs = -1
@@ -406,6 +402,18 @@ gs_cv_knc = GridSearchCV(estimator=pipe_cv_knc,
 
 gs_tfidf_knc = GridSearchCV(estimator=pipe_tfidf_knc,
                             param_grid=grid_params_tfidf_knc,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_log = GridSearchCV(estimator=pipe_cv_log,
+                         param_grid=grid_params_cv_log,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_log = GridSearchCV(estimator=pipe_tfidf_log,
+                            param_grid=grid_params_tfidf_log,
                             scoring=scoring,
                             cv=cv,
                             n_jobs=jobs)
@@ -471,15 +479,17 @@ gs_tfidf_pac = GridSearchCV(estimator=pipe_tfidf_pac,
                             n_jobs=jobs)
 
 # List of pipelines for ease of iteration
-grids = [gs_cv_sgd, gs_tfidf_sgd]
-# grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
+grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_knc, gs_tfidf_knc, gs_cv_log, gs_tfidf_log,
+         gs_cv_rfc, gs_tfidf_rfc]
+# , gs_cv_sgd, gs_tfidf_sgd, gs_cv_lsvc, gs_tfidf_lsvc, gs_cv_mlpc, gs_tfidf_mlpc, gs_cv_pac, gs_tfidf_pac]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ['cv_sgd', 'tfidf_sgd']
-# grid_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc']
+grid_labels = ["cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_knc", "tfidf_knc", "cv_log", "tfidf_log",
+               "cv_rfc", "tfidf_rfc"]
+# "cv_sgd", "tfidf_sgd", "cv_lsvc", "tfidf_lsvc", "cv_mlpc", "tfidf_mlpc", "cv_pac", "tfidf_pac"]
 
+# Model Selection - Running Grid Searches
 model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
-
 
 # Load pickle files with fitted models
 gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
