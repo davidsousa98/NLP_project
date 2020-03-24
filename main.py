@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import re
 import nltk
+import itertools
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -22,7 +23,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
-from sklearn.ensemble import VotingClassifier
+from mlxtend.classifier import EnsembleVoteClassifier
 
 # nltk.download('rslp')
 # nltk.download('punkt')
@@ -495,6 +496,35 @@ gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 
 # Ensemble
 
+models_list = [gs_cv_cnb,gs_tfidf_cnb,gs_cv_knn, gs_tfidf_knn,gs_cv_log,gs_tfidf_log,gs_cv_rfc,gs_tfidf_rfc,gs_cv_knc,gs_tfid_knc]
+models_labels = ['cv_cnb', 'tfidf_cnb','cv_knn','tfidf_knn','cv_log','tfidf_log','cv_rfc','tfidf_rfc','cv_knc','tfidf_knc']
+
+models_comb = list(itertools.combinations(models_list, 4))
+labels_comb = list(itertools.combinations(models_labels, 4))
+
+
+score = []
+for i in models_comb:
+    ensemble = EnsembleVoteClassifier(clfs=list(i),
+                                      voting='hard', refit=False)
+    ensemble.fit(X_train, y_train)
+    y_pred = ensemble.predict(X_test)
+    score.append(recall_score(y_test, y_pred, average='macro'))
+
+    results = (dict(sorted(zip(score,labels_comb), reverse = True)[:3]))
+
+print('The top 3 models are: ' , results, sep = '\n')
+
+
+# sorted(zip(score, models_labels), reverse=True)[:2])
+#
+ensemble = EnsembleVoteClassifier(clfs=[gs_tfidf_knn,gs_cv_log,gs_cv_knc],
+                                  voting='hard', refit=False)
+
+ensemble.fit(X_train, y_train)
+y_pred = ensemble.predict(X_test)
+print('The recall of the (tfidf_cnb, cv_knn) is: ', recall_score(y_test, y_pred, average='macro'))
+
 
 # Model Assessment
 # ----------------------------------------------------------------------------------------------------------------------
@@ -507,12 +537,6 @@ evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_n
                                                         output_dict=True))
 
 save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
-# plot confusion matrix
-plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
-
-# plot confusion matrix
-plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
-
 # plot confusion matrix
 plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
 
@@ -551,3 +575,4 @@ plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
 # References
 # ----------------------------------------------------------------------------------------------------------------------
 # https://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
+grid_params_tfidf_cnb

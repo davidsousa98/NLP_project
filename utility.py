@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('TkAgg')
+
 import os
 import zipfile as zp
 import io
@@ -18,8 +21,7 @@ from sklearn.metrics import recall_score
 from sklearn.feature_extraction.text import CountVectorizer
 from joblib import dump
 
-import matplotlib
-matplotlib.use('TkAgg')
+
 
 def get_files_zip():
     """
