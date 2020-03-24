@@ -1,0 +1,22 @@
+name: textmining
+channels:
+  - defaults
+dependencies:
+  - python
+  - jupyterlab
+  - pip
+  - notebook
+  - matplotlib
+  - scipy
+  - pandas
+  - numpy
+  - nltk
+  - imbalanced-learn
+  - tqdm
+  - beautifulsoup4
+  - requests
+  - lxml
+  - openpyxl
+  - scikit-learn
+prefix: C:\Users\davids\Anaconda3\envs\textmining
+
