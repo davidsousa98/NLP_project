@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKF
 from sklearn.naive_bayes import ComplementNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import PassiveAggressiveClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestCentroid
 from sklearn.linear_model import SGDClassifier
 from sklearn.svm import LinearSVC
@@ -20,6 +21,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
 from sklearn.ensemble import VotingClassifier
+from sklearn.ensemble import AdaBoostClassifier
 
 # nltk.download('rslp')
 # nltk.download('punkt')
@@ -504,6 +506,28 @@ gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 
 
 # Ensemble
+
+# AdaBoost
+clf = AdaBoostClassifier(base_estimator=[gs_cv_knc, gs_tfidf_knn], n_estimators=100, algorithm='SAMME', random_state=15)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+
+# Stacking classifier
+from sklearn.ensemble import StackingClassifier
+clf = StackingClassifier(estimators=[gs_cv_knc, gs_tfidf_knn],
+                         final_estimator=LogisticRegression(class_weight='balanced', multi_class='multinomial'))
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+
+#('knn', gs_tfidf_knn), ('knc', gs_cv_knc)
+
+from mlxtend.classifier import StackingCVClassifier
+sclf = StackingCVClassifier(classifiers=[gs_cv_knc, gs_tfidf_knn],
+                            meta_classifier=LogisticRegression(class_weight='balanced', multi_class='multinomial'),
+                            random_state=15)
+sclf.fit(X_train, y_train)
+y_pred = sclf.predict(y_test)
+
 
 
 # Model Assessment
