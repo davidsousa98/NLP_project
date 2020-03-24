@@ -14,6 +14,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.neighbors import NearestCentroid
 from sklearn.linear_model import SGDClassifier
 from sklearn.svm import LinearSVC
@@ -234,6 +235,12 @@ pipe_cv_mlpc = Pipeline([('cv', CountVectorizer()),
 pipe_tfidf_mlpc = Pipeline([('cv', TfidfVectorizer()),
                             ('mlpc', MLPClassifier(random_state=15))])
 
+pipe_cv_pac = Pipeline([('cv', CountVectorizer()),
+                        ('pac', PassiveAggressiveClassifier(class_weight='balanced', random_state=15))])
+
+pipe_tfidf_pac = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('pac', PassiveAggressiveClassifier(class_weight='balanced', random_state=15))])
+
 # Set grid search params
 grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "cv__binary": [True, False],
@@ -298,6 +305,21 @@ grid_params_tfidf_sgd = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "rfc__n_estimators": np.arange(100, 600, 100)}]
+
+grid_params_cv_pac = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "pac__early_stopping": [False, True],
+                       "pac__warm_start": [False, True]}]
+
+grid_params_tfidf_pac = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "pac__early_stopping": [False, True],
+                          "pac__warm_start": [False, True]}]
                           "sgd__penalty": ['l2', 'elasticnet'],
                           "sgd__loss:": ["modified_huber", "squared_hinge","perceptron"]}]
 #
@@ -435,6 +457,18 @@ gs_tfidf_mlpc = GridSearchCV(estimator=pipe_tfidf_mlpc,
                              cv=cv,
                              n_jobs=jobs)
 
+gs_cv_pac = GridSearchCV(estimator=pipe_cv_pac,
+                         param_grid=grid_params_cv_pac,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_pac = GridSearchCV(estimator=pipe_tfidf_pac,
+                            param_grid=grid_params_tfidf_pac,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
 # List of pipelines for ease of iteration
 grids = [gs_cv_sgd, gs_tfidf_sgd]
 # grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
@@ -443,8 +477,8 @@ grids = [gs_cv_sgd, gs_tfidf_sgd]
 grid_labels = ['cv_sgd', 'tfidf_sgd']
 # grid_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc']
 
-
 model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
+
 
 # Load pickle files with fitted models
 gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
@@ -458,6 +492,7 @@ gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
 gs_cv_knc = load("./outputs/Pipeline_cv_knc.pkl")
 gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 
+
 # Ensemble
 
 
@@ -470,7 +505,11 @@ y_pred = gs_tfidf_knn.predict(X_test)
 print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
 evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
                                                         output_dict=True))
+
 save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
+# plot confusion matrix
+plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
+
 # plot confusion matrix
 plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
 
