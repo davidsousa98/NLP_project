@@ -10,14 +10,12 @@ from imblearn.over_sampling import RandomOverSampler
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.naive_bayes import ComplementNB
-from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import PassiveAggressiveClassifier
 
 # nltk.download('rslp')
 # nltk.download('punkt')
@@ -205,6 +203,12 @@ pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
 pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
                            ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
+pipe_cv_pac = Pipeline([('cv', CountVectorizer()),
+                        ('pac', PassiveAggressiveClassifier(class_weight='balanced', random_state=15))])
+
+pipe_tfidf_pac = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('pac', PassiveAggressiveClassifier(class_weight='balanced', random_state=15))])
+
 # Set grid search params
 grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "cv__binary": [True, False],
@@ -257,6 +261,21 @@ grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
                           "rfc__n_estimators": np.arange(100, 600, 100)}]
+
+grid_params_cv_pac = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "pac__early_stopping": [False, True],
+                       "pac__warm_start": [False, True]}]
+
+grid_params_tfidf_pac = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "pac__early_stopping": [False, True],
+                          "pac__warm_start": [False, True]}]
+
 # Construct grid searches
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
@@ -310,12 +329,25 @@ gs_tfidf_rfc = GridSearchCV(estimator=pipe_tfidf_rfc,
                             cv=cv,
                             n_jobs=jobs)
 
+gs_cv_pac = GridSearchCV(estimator=pipe_cv_pac,
+                         param_grid=grid_params_cv_pac,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_pac = GridSearchCV(estimator=pipe_tfidf_pac,
+                            param_grid=grid_params_tfidf_pac,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
 # List of pipelines for ease of iteration
-grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc]
+grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc, gs_cv_pac, gs_tfidf_pac]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc']
+grid_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc', 'cv_pac', 'tfidf_pac']
 
+model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
 
 # Load pickle files with fitted models
 gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
@@ -326,6 +358,7 @@ gs_cv_log = load("./outputs/Pipeline_cv_log.pkl")
 gs_tfidf_log = load("./outputs/Pipeline_tfidf_log.pkl")
 gs_cv_rfc = load("./outputs/Pipeline_cv_rfc.pkl")
 gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
+
 
 # Ensemble
 
@@ -339,7 +372,11 @@ y_pred = gs_cv_knn.predict(X_test)
 print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
 evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
                                                         output_dict=True))
+
 save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
+
+# plot confusion matrix
+plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
 
 # # Prediction
 # # ----------------------------------------------------------------------------------------------------------------------

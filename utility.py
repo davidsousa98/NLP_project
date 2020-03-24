@@ -19,7 +19,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from joblib import dump
 
 import matplotlib
-# matplotlib.use('TkAgg')
+matplotlib.use('TkAgg')
 
 def get_files_zip():
     """
@@ -325,3 +325,4 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         # Save fitted grid to pickle file
         dump(gs, "./outputs/Pipeline_{}.pkl".format(label), compress=1)
     print("Model Selection process finished")
+
