@@ -187,47 +187,47 @@ X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                     stratify=y)
 
 # Construct some pipelines
-# pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
-#                         ('cnb', ComplementNB())])
-#
-# pipe_tfidf_cnb = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('cnb', ComplementNB())])
-#
-# pipe_cv_knn = Pipeline([('cv', CountVectorizer()),
-#                         ('knn', KNeighborsClassifier(metric='cosine'))])
-#
-# pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('knn', KNeighborsClassifier(metric='cosine'))]) NearestCentroid
-#
-# pipe_cv_knc = Pipeline([('cv', CountVectorizer()),
-#                         ('knc', NearestCentroid())])
-#
-# pipe_tfidf_knc = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('knc', NearestCentroid())])
+pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
+                        ('cnb', ComplementNB())])
 
-# pipe_cv_log = Pipeline([('cv', CountVectorizer()),
-#                         ('log', SGDClassifier(random_state=15))])
-#
-# pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('log', SGDClassifier(random_state=15))])
+pipe_tfidf_cnb = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('cnb', ComplementNB())])
+
+pipe_cv_knn = Pipeline([('cv', CountVectorizer()),
+                        ('knn', KNeighborsClassifier(metric='cosine'))])
+
+pipe_tfidf_knn = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('knn', KNeighborsClassifier(metric='cosine'))])
+
+pipe_cv_knc = Pipeline([('cv', CountVectorizer()),
+                        ('knc', NearestCentroid())])
+
+pipe_tfidf_knc = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('knc', NearestCentroid())])
+
+pipe_cv_log = Pipeline([('cv', CountVectorizer()),
+                        ('log', SGDClassifier(random_state=15))])
+
+pipe_tfidf_log = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('log', SGDClassifier(random_state=15))])
 
 pipe_cv_sgd = Pipeline([('cv', CountVectorizer()),
                         ('sgd', SGDClassifier(random_state=15))])
 
 pipe_tfidf_sgd = Pipeline([('tfidf', TfidfVectorizer()),
                            ('sgd', SGDClassifier(random_state=15))])
-#
-# pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
-#                         ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
-#
-# pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
-#                            ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
-# pipe_cv_lsvc = Pipeline([('cv', CountVectorizer()),
-#                          ('lsvc', LinearSVC(random_state=15))])
-#
-# pipe_tfidf_lsvc = Pipeline([('cv', TfidfVectorizer()),
-#                             ('lsvc', LinearSVC(random_state=15))])
+pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
+                        ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
+
+pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
+                           ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
+
+pipe_cv_lsvc = Pipeline([('cv', CountVectorizer()),
+                         ('lsvc', LinearSVC(random_state=15))])
+
+pipe_tfidf_lsvc = Pipeline([('cv', TfidfVectorizer()),
+                            ('lsvc', LinearSVC(random_state=15))])
 
 pipe_cv_mlpc = Pipeline([('cv', CountVectorizer()),
                          ('mlpc', MLPClassifier(random_state=15))])
@@ -294,7 +294,7 @@ grid_params_tfidf_log = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "log__penalty": ['l1', 'l2'],
                           "log__alpha": np.logspace(-3, 3, 7)}]
 
-grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+grid_params_cv_sgd = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
@@ -302,6 +302,20 @@ grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "sgd__loss:": ["modified_huber", "squared_hinge","perceptron"]}]
 
 grid_params_tfidf_sgd = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "sgd__penalty": ['l2', 'elasticnet'],
+                          "sgd__loss:": ["modified_huber", "squared_hinge", "perceptron"]}]
+
+grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "rfc__n_estimators": np.arange(100, 600, 100)}]
+
+grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
@@ -320,33 +334,31 @@ grid_params_tfidf_pac = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
                           "pac__early_stopping": [False, True],
                           "pac__warm_start": [False, True]}]
-                          "sgd__penalty": ['l2', 'elasticnet'],
-                          "sgd__loss:": ["modified_huber", "squared_hinge","perceptron"]}]
-#
-# grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-#                        "cv__binary": [True, False],
-#                        "cv__stop_words": [[".", "...", "!", "?"], None],
-#                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                        "rfc__n_estimators": np.arange(100, 600, 100)}]
-#
-# grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-#                           "tfidf__binary": [True, False],
-#                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                           "rfc__n_estimators": np.arange(100, 600, 100)}]
-#                          "rfc__n_estimators": np.arange(100, 600, 100)}]
 
-# grid_params_cv_lsvc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-#                         "cv__binary": [True, False],
-#                         "cv__stop_words": [[".", "...", "!", "?"], None],
-#                         "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                         }]
-#
-# grid_params_tfidf_lsvc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-#                            "tfidf__binary": [True, False],
-#                            "tfidf__stop_words": [[".", "...", "!", "?"], None],
-#                            "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-#                            }]
+grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                       "cv__binary": [True, False],
+                       "cv__stop_words": [[".", "...", "!", "?"], None],
+                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                       "rfc__n_estimators": np.arange(100, 600, 100)}]
+
+grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                          "tfidf__binary": [True, False],
+                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                          "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                          "rfc__n_estimators": np.arange(100, 600, 100),
+                         "rfc__n_estimators": np.arange(100, 600, 100)}]
+
+grid_params_cv_lsvc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
+                        "cv__binary": [True, False],
+                        "cv__stop_words": [[".", "...", "!", "?"], None],
+                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                        }]
+
+grid_params_tfidf_lsvc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
+                           "tfidf__binary": [True, False],
+                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
+                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                           }]
 
 grid_params_cv_mlpc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                         "cv__binary": [True, False],
@@ -372,42 +384,42 @@ grid_params_tfidf_mlpc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
 scoring = make_scorer(recall_score, average="macro")
-#
-# gs_cv_cnb = GridSearchCV(estimator=pipe_cv_cnb,
-#                          param_grid=grid_params_cv_cnb,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_cnb = GridSearchCV(estimator=pipe_tfidf_cnb,
-#                             param_grid=grid_params_tfidf_cnb,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
-#
-# gs_cv_knn = GridSearchCV(estimator=pipe_cv_knn,
-#                          param_grid=grid_params_cv_knn,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
-#                             param_grid=grid_params_tfidf_knn,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
 
-# gs_cv_knc = GridSearchCV(estimator=pipe_cv_knc,
-#                          param_grid=grid_params_cv_knc,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_knc = GridSearchCV(estimator=pipe_tfidf_knc,
-#                             param_grid=grid_params_tfidf_knc,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
+gs_cv_cnb = GridSearchCV(estimator=pipe_cv_cnb,
+                         param_grid=grid_params_cv_cnb,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_cnb = GridSearchCV(estimator=pipe_tfidf_cnb,
+                            param_grid=grid_params_tfidf_cnb,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_knn = GridSearchCV(estimator=pipe_cv_knn,
+                         param_grid=grid_params_cv_knn,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_knn = GridSearchCV(estimator=pipe_tfidf_knn,
+                            param_grid=grid_params_tfidf_knn,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_knc = GridSearchCV(estimator=pipe_cv_knc,
+                         param_grid=grid_params_cv_knc,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_knc = GridSearchCV(estimator=pipe_tfidf_knc,
+                            param_grid=grid_params_tfidf_knc,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
 
 gs_cv_sgd = GridSearchCV(estimator=pipe_cv_sgd,
                          param_grid=grid_params_cv_sgd,
@@ -420,30 +432,30 @@ gs_tfidf_sgd = GridSearchCV(estimator=pipe_tfidf_sgd,
                             scoring=scoring,
                             cv=cv,
                             n_jobs=jobs)
-#
-# gs_cv_rfc = GridSearchCV(estimator=pipe_cv_rfc,
-#                          param_grid=grid_params_cv_rfc,
-#                          scoring=scoring,
-#                          cv=cv,
-#                          n_jobs=jobs)
-#
-# gs_tfidf_rfc = GridSearchCV(estimator=pipe_tfidf_rfc,
-#                             param_grid=grid_params_tfidf_rfc,
-#                             scoring=scoring,
-#                             cv=cv,
-#                             n_jobs=jobs)
 
-# gs_cv_lsvc = GridSearchCV(estimator=pipe_cv_lsvc,
-#                           param_grid=grid_params_cv_lsvc,
-#                           scoring=scoring,
-#                           cv=cv,
-#                           n_jobs=jobs)
-#
-# gs_tfidf_lsvc = GridSearchCV(estimator=pipe_tfidf_lsvc,
-#                              param_grid=grid_params_tfidf_lsvc,
-#                              scoring=scoring,
-#                              cv=cv,
-#                              n_jobs=jobs)
+gs_cv_rfc = GridSearchCV(estimator=pipe_cv_rfc,
+                         param_grid=grid_params_cv_rfc,
+                         scoring=scoring,
+                         cv=cv,
+                         n_jobs=jobs)
+
+gs_tfidf_rfc = GridSearchCV(estimator=pipe_tfidf_rfc,
+                            param_grid=grid_params_tfidf_rfc,
+                            scoring=scoring,
+                            cv=cv,
+                            n_jobs=jobs)
+
+gs_cv_lsvc = GridSearchCV(estimator=pipe_cv_lsvc,
+                          param_grid=grid_params_cv_lsvc,
+                          scoring=scoring,
+                          cv=cv,
+                          n_jobs=jobs)
+
+gs_tfidf_lsvc = GridSearchCV(estimator=pipe_tfidf_lsvc,
+                             param_grid=grid_params_tfidf_lsvc,
+                             scoring=scoring,
+                             cv=cv,
+                             n_jobs=jobs)
 
 gs_cv_mlpc = GridSearchCV(estimator=pipe_cv_mlpc,
                           param_grid=grid_params_cv_mlpc,
