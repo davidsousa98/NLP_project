@@ -335,16 +335,6 @@ grid_params_tfidf_pac = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "pac__early_stopping": [False, True],
                           "pac__warm_start": [False, True]}]
 
-grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-                       "cv__binary": [True, False],
-                       "cv__stop_words": [[".", "...", "!", "?"], None],
-                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                       "rfc__n_estimators": np.arange(100, 600, 100)}]
-
-grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
-                          "tfidf__binary": [True, False],
-                          "tfidf__stop_words": [[".", "...", "!", "?"], None],
-                         "rfc__n_estimators": np.arange(100, 600, 100)}]
 
 grid_params_cv_lsvc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                         "cv__binary": [True, False],
