@@ -1,10 +1,12 @@
-from utility import get_files_zip, read_txt_zip, clean, update_df, sample_excerpts, plot_cm, word_counter, save_excel, \
-    get_top_n_grams, model_selection
+from utility import get_files_zip, read_txt_zip, TextCleaner, update_df, sample_excerpts, plot_cm, word_counter, save_excel, \
+    get_top_n_grams, model_selection, model_assessment_vis
 from joblib import load
 import numpy as np
 import pandas as pd
 import re
 import nltk
+from nltk.corpus import stopwords
+from nltk.stem import SnowballStemmer, RSLPStemmer
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -25,17 +27,15 @@ from sklearn.ensemble import VotingClassifier
 # nltk.download('punkt')
 
 # TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
-# TODO: Build bar plot with bar for each best_model. height = mean_test_score, interval = std_test_score
 # TODO: Perform ensemble on best models
-# TODO: Integrate text cleaning in pipeline
+# TODO: Use word2vec to represent words
 
 
 # Building Corpus
 # ----------------------------------------------------------------------------------------------------------------------
 # Reading files from zip without extracting them
 files = list(filter(lambda x: ".txt" in x, get_files_zip()))
-df = pd.DataFrame({"file": files,
-                   "text": read_txt_zip(files)})
+df = pd.DataFrame({"file": files, "text": read_txt_zip(files)})
 
 # Creating train_df
 df["type"] = df["file"].apply(lambda x: re.findall(r"(^[a-z]+)/", x)[0])
@@ -49,13 +49,21 @@ submission_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=
 
 # Preprocessing - Reference: http://www.nltk.org/howto/portuguese_en.html
 # ----------------------------------------------------------------------------------------------------------------------
-updates = clean(
-    train_df["text"],
-    punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_',
-                 '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
+# TextCleaner behaves like a sklearn estimator. We built it this way only after realising we could integrate it in a
+# sklearn Pipeline. However we realised afterwards that this would only work if we would have produced the excerpts
+# before the cleaning instead of after. This would generate different data and since we had already fitted some models
+# with the previous data we decided not to include it. However everything is built in order to integrate it in the
+# Pipeline and fit a GridSearch to find out the overall best combination of parameters
+
+cleaner = TextCleaner(
+    punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_', '`', '{', '|',
+                 '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
     stoppers=[".", "...", "!", "?"],
-    stemmer=nltk.stem.SnowballStemmer('portuguese')
+    stopwords=stopwords.words('portuguese'),
+    stemmer=SnowballStemmer('portuguese')  # RSLPStemmer('portuguese')
 )
+
+updates = cleaner.transform(train_df["text"])
 update_df(train_df, updates)
 
 # Data Exploration
@@ -109,68 +117,6 @@ train_excerpt_df["word_count"].describe()  # word count mean is around 500
 #                                                                         stop=max_index + sum(author_weights.values()))))
 # y_train = y_train.append(pd.Series(y_res.flatten(), index=pd.RangeIndex(start=max_index,
 #                                                                         stop=max_index + sum(author_weights.values()))))
-#
-# # Feature Engineering
-# # ----------------------------------------------------------------------------------------------------------------------
-# # Bag-of-words
-# cv = CountVectorizer(max_df=0.9, binary=True, stop_words=[".", "...", "!", "?"])  # ignores terms with document
-# # frequency above 0.9
-# X = cv.fit_transform(X_train)
-# y = y_train
-# X_test = cv.transform(X_test)
-#
-# # N-Gram
-# cv = CountVectorizer(
-#     max_df=0.9,
-#     binary=False,
-#     stop_words=[".", "...", "!", "?"],
-#     ngram_range=(1, 3)
-# )
-# X = cv.fit_transform(X_train)
-# y = y_train
-# X_test = cv.transform(X_test)
-#
-# top_df = get_top_n_grams(X_train, top_k=20, n=1)
-# # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=2)
-# # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=3)
-#
-# # TF-IDF
-# cv = TfidfVectorizer(max_df=0.8, stop_words=[".", "...", "!", "?"], ngram_range=(1, 3))
-# X = cv.fit_transform(X_train)
-# y = y_train
-# X_test = cv.transform(X_test)
-#
-# feature_names = cv.get_feature_names()
-#
-# # Model
-# # ----------------------------------------------------------------------------------------------------------------------
-# # Naive Bayes Classifier
-# modelnaive = ComplementNB()  # ComplementNB appropriate for text data and imbalanced classes
-# modelnaive.fit(X, y_train)
-# y_pred = modelnaive.predict(X_test)
-#
-# # K-nearest neighbors
-# modelknn = KNeighborsClassifier(n_neighbors=5,
-#                                 weights='distance',
-#                                 metric='cosine')
-# modelknn.fit(X, y_train)
-# y_pred = modelknn.predict(X_test)
-#
-# # Word2Vec
-# # X_train = pd.DataFrame(X)
-# # word2vec = Word2Vec(,min_count = 1, size = 100, window = 5)
-# # y_pred = word2vec.predict(X_dev)
-#
-# # Logistic Regression
-# log_reg = LogisticRegression(multi_class='multinomial', random_state=15).fit(X, y)
-# y_pred = log_reg.predict(X_test)
-#
-# # Random Forest Classifier
-# rfc = RandomForestClassifier(class_weight='balanced', random_state=15).fit(X, y)
-# y_pred = rfc.predict(X_test)
-#
-# unique, counts = np.unique(y_pred, return_counts=True)
-# print(np.asarray((unique, counts)).T)
 #
 # Model Selection
 # ----------------------------------------------------------------------------------------------------------------------
@@ -334,9 +280,8 @@ grid_params_cv_mlpc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                         "cv__binary": [True, False],
                         "cv__stop_words": [[".", "...", "!", "?"], None],
                         "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                        "mlpc__hidden_layer_sizes": [(100, 100, 100), (100, 100), (100,)],
+                        "mlpc__hidden_layer_sizes": [(50, 50), (100,)],
                         "mlpc__activation": ['tanh', 'relu'],
-                        'mlpc__solver': ['sgd', 'adam'],
                         'mlpc__alpha': [0.0001, 0.05],
                         'mlpc__learning_rate': ['constant', 'adaptive']}]
 
@@ -344,9 +289,8 @@ grid_params_tfidf_mlpc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                            "tfidf__binary": [True, False],
                            "tfidf__stop_words": [[".", "...", "!", "?"], None],
                            "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                           "mlpc__hidden_layer_sizes": [(100, 100, 100), (100, 100), (100,)],
+                           "mlpc__hidden_layer_sizes": [(50, 50), (100,)],
                            "mlpc__activation": ['tanh', 'relu'],
-                           'mlpc__solver': ['sgd', 'adam'],
                            'mlpc__alpha': [0.0001, 0.05],
                            'mlpc__learning_rate': ['constant', 'adaptive']}]
 
@@ -495,13 +439,20 @@ gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
 gs_tfidf_cnb = load("./outputs/Pipeline_tfidf_cnb.pkl")
 gs_cv_knn = load("./outputs/Pipeline_cv_knn.pkl")
 gs_tfidf_knn = load("./outputs/Pipeline_tfidf_knn.pkl")
+gs_cv_knc = load("./outputs/Pipeline_cv_knc.pkl")
+gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 gs_cv_log = load("./outputs/Pipeline_cv_log.pkl")
 gs_tfidf_log = load("./outputs/Pipeline_tfidf_log.pkl")
 gs_cv_rfc = load("./outputs/Pipeline_cv_rfc.pkl")
 gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
-gs_cv_knc = load("./outputs/Pipeline_cv_knc.pkl")
-gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
-
+gs_cv_sgd = load("./outputs/Pipeline_cv_sgd.pkl")
+gs_tfidf_sgd = load("./outputs/Pipeline_tfidf_sgd.pkl")
+gs_cv_lsvc = load("./outputs/Pipeline_cv_lsvc.pkl")
+gs_tfidf_lsvc = load("./outputs/Pipeline_tfidf_lsvc.pkl")
+gs_cv_mlpc = load("./outputs/Pipeline_cv_mlpc.pkl")
+gs_tfidf_mlpc = load("./outputs/Pipeline_tfidf_mlpc.pkl")
+gs_cv_pac = load("./outputs/Pipeline_cv_pac.pkl")
+gs_tfidf_pac = load("./outputs/Pipeline_tfidf_pac.pkl")
 
 # Ensemble
 
@@ -510,42 +461,105 @@ gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 # ----------------------------------------------------------------------------------------------------------------------
 # See reference:
 # https://scikit-learn.org/stable/auto_examples/model_selection/plot_multi_metric_evaluation.html#sphx-glr-auto-examples-model-selection-plot-multi-metric-evaluation-py
+labels = {"tfidf": "TF-IDF",
+          "cv": "CountVectorizer",
+          "cnb": "NaiveBayes",
+          "knn": "KNearestNeighbors",
+          "log": "LogisticRegression",
+          "rfc": "RandomForest",
+          "sgd": "StocasticGradientDescent",
+          "lsvc": "LinearSupportVector",
+          "mlpc": "MultiLayerPerceptron",
+          "pac": "PassiveAgressive"}
+xlsx_path = './outputs/Pipelines.xlsx'
+
+# Comparing Test Error Score between Pipelines
+model_assessment_vis(xlsx_path, labels)
+
 y_pred = gs_tfidf_knn.predict(X_test)
 
-print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
-evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
-                                                        output_dict=True))
-
-save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
-# plot confusion matrix
-plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
+classification_report(y_test, y_pred, target_names=list(np.unique(y_test)))
 
 # plot confusion matrix
 plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
 
-# plot confusion matrix
-plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
+# evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
+#                                                         output_dict=True))
+# save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
 
-# # Prediction
-# # ----------------------------------------------------------------------------------------------------------------------
-# # Predict the author in the submission set
-# test_texts = clean(
-#     submission_df["text"],
-#     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_',
-#                  '`', '{', '|', '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
-#     stoppers=[".", "...", "!", "?"],
-#     stemmer=nltk.stem.SnowballStemmer('portuguese')
-# )
-# X_test = cv.transform(test_texts)
-# predict_test = modelknn.predict(X_test)
-#
-# # Creating csv file with predictions
-# submission = submission_df
-# submission["prediction"] = predict_test
-# submission.to_csv("./outputs/submission.csv", index=False)
+# Prediction
+# ----------------------------------------------------------------------------------------------------------------------
+# Predict the author in the submission set
+best_pipeline = gs_cv_knc
+submission = cleaner.transform(submission_df["text"])
+y_submission = best_pipeline.predict(submission)
+
+# Creating csv file with predictions
+submission = pd.Series(y_submission, index=submission_df.index)
+submission.to_csv("./outputs/submission.csv", index=False)
 
 # Extras
 # ----------------------------------------------------------------------------------------------------------------------
+# # Feature Engineering
+# # Bag-of-words
+# cv = CountVectorizer(max_df=0.9, binary=True, stop_words=[".", "...", "!", "?"])  # ignores terms with document
+# # frequency above 0.9
+# X = cv.fit_transform(X_train)
+# y = y_train
+# X_test = cv.transform(X_test)
+#
+# # N-Gram
+# cv = CountVectorizer(
+#     max_df=0.9,
+#     binary=False,
+#     stop_words=[".", "...", "!", "?"],
+#     ngram_range=(1, 3)
+# )
+# X = cv.fit_transform(X_train)
+# y = y_train
+# X_test = cv.transform(X_test)
+#
+# top_df = get_top_n_grams(X_train, top_k=20, n=1)
+# # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=2)
+# # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=3)
+#
+# # TF-IDF
+# cv = TfidfVectorizer(max_df=0.8, stop_words=[".", "...", "!", "?"], ngram_range=(1, 3))
+# X = cv.fit_transform(X_train)
+# y = y_train
+# X_test = cv.transform(X_test)
+#
+# feature_names = cv.get_feature_names()
+#
+# # Model
+# # Naive Bayes Classifier
+# modelnaive = ComplementNB()  # ComplementNB appropriate for text data and imbalanced classes
+# modelnaive.fit(X, y_train)
+# y_pred = modelnaive.predict(X_test)
+#
+# # K-nearest neighbors
+# modelknn = KNeighborsClassifier(n_neighbors=5,
+#                                 weights='distance',
+#                                 metric='cosine')
+# modelknn.fit(X, y_train)
+# y_pred = modelknn.predict(X_test)
+#
+# # Word2Vec
+# # X_train = pd.DataFrame(X)
+# # word2vec = Word2Vec(,min_count = 1, size = 100, window = 5)
+# # y_pred = word2vec.predict(X_dev)
+#
+# # Logistic Regression
+# log_reg = LogisticRegression(multi_class='multinomial', random_state=15).fit(X, y)
+# y_pred = log_reg.predict(X_test)
+#
+# # Random Forest Classifier
+# rfc = RandomForestClassifier(class_weight='balanced', random_state=15).fit(X, y)
+# y_pred = rfc.predict(X_test)
+#
+# unique, counts = np.unique(y_pred, return_counts=True)
+# print(np.asarray((unique, counts)).T)
+#
 # POS Tagging
 # stok = nltk.data.load('tokenizers/punkt/portuguese.pickle')
 #

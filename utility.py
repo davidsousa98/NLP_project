@@ -16,10 +16,13 @@ from nltk.corpus import stopwords
 from nltk import word_tokenize
 from sklearn.metrics import recall_score
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.base import BaseEstimator, TransformerMixin
 from joblib import dump
+import plotly.graph_objects as go
+import plotly.offline as pyo
 
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 def get_files_zip():
     """
@@ -50,84 +53,177 @@ def read_txt_zip(files):
     return df_list
 
 
-def clean(text_list, punctuation, stoppers, lemmatize=None, stemmer=None):
-    """
-    Function that a receives a list of strings and preprocesses it.
+# Custom Transformer that extracts columns passed as argument to its constructor
+class TextCleaner(BaseEstimator, TransformerMixin):
 
-    :param text_list: list of strings.
-    :param punctuation: list of punctuation to exclude.
-    :param stoppers: list of punctuation that defines the end of an excerpt.
-    :param lemmatize: lemmatizer to apply if provided.
-    :param stemmer: stemmer to apply if provided.
+    # Class Constructor
+    def __init__(self, punctuation, stoppers, stopwords, accentuation=True, lemmatizer=None, stemmer=None):
+        """
+            :param punctuation: list of punctuation to exclude in the text.
+            :param stoppers: list of punctuation that defines the end of an excerpt.
+            :param stopwords: list of stopwords to exclude.
+            :accentuation: whether or not to exclude word accentuation.
+            :param lemmatizer: lemmatizer to apply if provided.
+            :param stemmer: stemmer to apply if provided.
+        """
+        self._punctuation = punctuation
+        self._stoppers = stoppers
+        self._stopwords = stopwords
+        self._lemmatizer = lemmatizer
+        self._stemmer = stemmer
+        self._accentuation = accentuation
 
-    Returns:
-        - list of cleaned strings.
-    """
-    updates = []
-    for j in range(len(text_list)):
 
-        text = text_list[j]
+    # Return self nothing else to do here
+    def fit(self, X, y=None):
+        return self
 
-        # LOWERCASING
-        text = text.lower()
-
-        # REMOVING # SIGN (don't remove with punctuation as it will destroy tokens)
-        text = text.replace("#", " ")
-
-        # TOKENIZATION
-        text = re.sub('\S+\$\d+( réis)*', ' #PRICE ', text)  # price token
-        text = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})',
-                      " #DATE ", text)  # date token
-        text = re.sub('[0-9]+', ' #NUMBER ', text)  # number token
-        # cities token
+    # Method that describes what we need this transformer to do
+    def transform(self, X, y=None):
+        """
+            :param X: numpy array with texts for cleaning
+        """
         url = "https://simplemaps.com/static/data/country-cities/pt/pt.csv"
         cities = pd.read_csv(io.StringIO(requests.get(url).content.decode('utf-8')))["city"].to_list()
         cities.append("lisboa")
         cities = list(map(lambda x: x.lower(), cities))
-        for i in cities:
-            if i in text:
-                text = text.replace(i, ' #CITY ')
-        # week days token
         week_days = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado',
                      'domingo']
-        for i in week_days:
-            if i in text:
-                text = text.replace(i, ' #WDAY ')
+        updates = []
+        for j in X:
+            # LOWERCASING
+            text = j.lower()
 
-        # REMOVE PUNCTUATION, SEPARATE KEEP PUNCTUATION WITH SPACES AND KEEP TOKENS #
-        def repl(matchobj):
-            keep_punct = list(set(punct) - (set(punctuation) - set(stoppers)) - set("#"))
-            if matchobj.group(0) in keep_punct:
-                return " {} ".format(matchobj.group(0))
-            elif matchobj.group(0) == "#":
-                return '#'
-            else:
-                return ' '
-        text = re.sub("([^a-zA-Z0-9])", repl, text)
+            # REMOVING # SIGN (don't remove with punctuation as it will destroy tokens)
+            text = text.replace("#", " ")
 
-        # REMOVE STOPWORDS
-        stop = set(stopwords.words('portuguese'))
-        text = " ".join(" " if word in stop else word for word in text.split())
+            # TOKENIZATION
+            text = re.sub('\S+\$\d+( réis)*', ' #PRICE ', text)  # price token
+            text = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})',
+                          " #DATE ", text)  # date token
+            text = re.sub('[0-9]+', ' #NUMBER ', text)  # number token
+            # cities token
+            for i in cities:
+                if i in text:
+                    text = text.replace(i, ' #CITY ')
+            # week days token
+            for i in week_days:
+                if i in text:
+                    text = text.replace(i, ' #WDAY ')
 
-        # REMOVE HTML TAGS
-        text = BeautifulSoup(text, features="lxml").get_text()
+            # REMOVE PUNCTUATION, SEPARATE KEEP PUNCTUATION WITH SPACES AND KEEP TOKENS #
+            def repl(matchobj):
+                keep_punct = list(set(punct) - (set(self._punctuation) - set(self._stoppers)) - set("#"))
+                if matchobj.group(0) in keep_punct:
+                    return " {} ".format(matchobj.group(0))
+                elif matchobj.group(0) == "#":
+                    return '#'
+                else:
+                    return ' '
 
-        if lemmatize:
-            lemma = None  # Not defined
-            text = " ".join(lemma.lemmatize(word) for word in text.split())
+            text = re.sub("([^a-zA-Z0-9])", repl, text)
 
-        if stemmer:
-            # stemmer = nltk.stem.RSLPStemmer()
-            # stemmer = nltk.stem.SnowballStemmer('portuguese')
-            text = " ".join(stemmer.stem(word) for word in text.split())
+            # REMOVE STOPWORDS
+            text = " ".join(" " if word in self._stopwords else word for word in text.split())
 
-        # REMOVING ACCENTUATION
-        text = ''.join(c for c in unicodedata.normalize('NFD', text)
-                       if unicodedata.category(c) != 'Mn')
+            # REMOVE HTML TAGS
+            text = BeautifulSoup(text, features="lxml").get_text()
 
-        updates.append(text)
+            if self._lemmatizer:
+                text = " ".join(self._lemmatizer.lemmatize(word) for word in text.split())
 
-    return updates
+            if self._stemmer:
+                # stemmer = nltk.stem.RSLPStemmer()
+                # stemmer = nltk.stem.SnowballStemmer('portuguese')
+                text = " ".join(self._stemmer.stem(word) for word in text.split())
+
+            # REMOVING ACCENTUATION
+            if self._accentuation:
+                text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+
+            updates.append(text)
+
+        return np.array(updates)
+
+
+# def clean(text_list, punctuation, stoppers, lemmatize=None, stemmer=None):
+#     """
+#     Function that a receives a list of strings and preprocesses it.
+#
+#     :param text_list: list of strings.
+#     :param punctuation: list of punctuation to exclude.
+#     :param stoppers: list of punctuation that defines the end of an excerpt.
+#     :param lemmatize: lemmatizer to apply if provided.
+#     :param stemmer: stemmer to apply if provided.
+#
+#     Returns:
+#         - list of cleaned strings.
+#     """
+#     updates = []
+#     for j in range(len(text_list)):
+#
+#         text = text_list[j]
+#
+#         # LOWERCASING
+#         text = text.lower()
+#
+#         # REMOVING # SIGN (don't remove with punctuation as it will destroy tokens)
+#         text = text.replace("#", " ")
+#
+#         # TOKENIZATION
+#         text = re.sub('\S+\$\d+( réis)*', ' #PRICE ', text)  # price token
+#         text = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})',
+#                       " #DATE ", text)  # date token
+#         text = re.sub('[0-9]+', ' #NUMBER ', text)  # number token
+#         # cities token
+#         url = "https://simplemaps.com/static/data/country-cities/pt/pt.csv"
+#         cities = pd.read_csv(io.StringIO(requests.get(url).content.decode('utf-8')))["city"].to_list()
+#         cities.append("lisboa")
+#         cities = list(map(lambda x: x.lower(), cities))
+#         for i in cities:
+#             if i in text:
+#                 text = text.replace(i, ' #CITY ')
+#         # week days token
+#         week_days = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado',
+#                      'domingo']
+#         for i in week_days:
+#             if i in text:
+#                 text = text.replace(i, ' #WDAY ')
+#
+#         # REMOVE PUNCTUATION, SEPARATE KEEP PUNCTUATION WITH SPACES AND KEEP TOKENS #
+#         def repl(matchobj):
+#             keep_punct = list(set(punct) - (set(punctuation) - set(stoppers)) - set("#"))
+#             if matchobj.group(0) in keep_punct:
+#                 return " {} ".format(matchobj.group(0))
+#             elif matchobj.group(0) == "#":
+#                 return '#'
+#             else:
+#                 return ' '
+#         text = re.sub("([^a-zA-Z0-9])", repl, text)
+#
+#         # REMOVE STOPWORDS
+#         stop = set(stopwords.words('portuguese'))
+#         text = " ".join(" " if word in stop else word for word in text.split())
+#
+#         # REMOVE HTML TAGS
+#         text = BeautifulSoup(text, features="lxml").get_text()
+#
+#         if lemmatize:
+#             lemma = None  # Not defined
+#             text = " ".join(lemma.lemmatize(word) for word in text.split())
+#
+#         if stemmer:
+#             # stemmer = nltk.stem.RSLPStemmer()
+#             # stemmer = nltk.stem.SnowballStemmer('portuguese')
+#             text = " ".join(stemmer.stem(word) for word in text.split())
+#
+#         # REMOVING ACCENTUATION
+#         text = ''.join(c for c in unicodedata.normalize('NFD', text)
+#                        if unicodedata.category(c) != 'Mn')
+#
+#         updates.append(text)
+#
+#     return updates
 
 
 def update_df(dataframe, list_updated):
@@ -326,3 +422,49 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         dump(gs, "./outputs/Pipeline_{}.pkl".format(label), compress=1)
     print("Model Selection process finished")
 
+
+def model_assessment_vis(path, labels):
+    """
+    Produces a bar plot for mean test score comparison together with error.
+    :param path: path to excel file with each sheet representing a GridSearchCV results.
+    :param labels: dictionary that contains grid labels (e.g. cv, knn) as keys and visualization labels as values
+    (e.g. CountVectorizer, KNearestNeighbors).
+
+    Returns: Plotly Visualization
+    """
+    xls = pd.ExcelFile(path, engine="openpyxl")
+    dfs = [pd.read_excel(xls, i) for i in xls.sheet_names]
+
+    update_dfs = []
+    for i, df in enumerate(dfs):
+        params = xls.sheet_names[i].split("_")
+        df = df.loc[df.best_index == 1, ['mean_test_score', 'std_test_score']]
+        df['model'] = labels[params[1]]
+        df['encoding'] = labels[params[0]]
+        update_dfs.append(df)
+
+    xls.close()
+    vis = pd.concat(update_dfs, ignore_index=True)
+    vis_tfidf = vis.loc[vis.encoding == 'TF-IDF']
+    vis_cv = vis.loc[vis.encoding == 'CountVectorizer']
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        name='Bag of Words',
+        x=vis_cv['model'], y=vis_cv['mean_test_score'],
+        error_y=dict(type='data', array=vis_cv['std_test_score'])
+    ))
+    fig.add_trace(go.Bar(
+        name='TF-IDF',
+        x=vis_tfidf['model'], y=vis_tfidf['mean_test_score'],
+        error_y=dict(type='data', array=vis_tfidf['std_test_score'])
+    ))
+
+    fig.update_layout(
+        barmode='group',
+        title="MODEL COMPARISON",
+        xaxis_title="Model",
+        yaxis_title="Recall average"
+    )
+
+    return pyo.plot(fig)
