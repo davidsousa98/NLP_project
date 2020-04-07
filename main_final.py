@@ -18,7 +18,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, StackingClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, confusion_matrix, recall_score, f1_score, make_scorer
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, make_scorer
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.classifier import StackingCVClassifier
 # nltk.download('rslp')
@@ -375,12 +375,14 @@ gs_tfidf_pac = GridSearchCV(estimator=pipe_tfidf_pac,
                             n_jobs=jobs)
 
 # List of pipelines for ease of iteration
-grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc,
-         gs_cv_mlpc, gs_tfidf_mlpc, gs_cv_knc, gs_tfidf_knc, gs_cv_sgd, gs_tfidf_sgd, gs_cv_pac, gs_tfidf_pac]
+grids = [gs_cv_log, gs_cv_sgd, gs_tfidf_sgd]
+    # gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log,  gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc,
+    #      gs_cv_mlpc, gs_tfidf_mlpc, gs_cv_knc, gs_tfidf_knc, gs_cv_sgd, gs_tfidf_sgd, gs_cv_pac, gs_tfidf_pac]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ["cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_log", "tfidf_log", "cv_rfc", "tfidf_rfc",
-               "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
+grid_labels = ["cv_log", "cv_sgd", "tfidf_sgd"]
+    # "cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_log", "tfidf_log", "cv_rfc", "tfidf_rfc",
+    #       "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
 
 # Model Selection - Running Grid Searches
 model_selection(grids, X_500train, y_500train, X_500test, y_500test, grid_labels)
@@ -440,7 +442,7 @@ for i in models_comb:
                                       voting='hard', refit=False)
     ensemble.fit(X_500train, y_500train)
     y_pred = ensemble.predict(X_500test)
-    score.append(recall_score(y_500test, y_pred, average='macro'))
+    score.append(f1_score(y_500test, y_pred, average='macro'))
 
     results = (dict(sorted(zip(score, labels_comb), reverse=True)[:3]))
 
@@ -453,7 +455,7 @@ print('The top 3 models are: ', results, sep='\n')
 #
 # ensemble.fit(X_train, y_train)
 # y_pred = ensemble.predict(X_test)
-# print('The recall of the (tfidf_cnb, cv_knn) is: ', recall_score(y_test, y_pred, average='macro'))
+# print('The f1_score of the (tfidf_cnb, cv_knn) is: ', f1_score(y_test, y_pred, average='macro'))
 
 # Model Assessment
 # ----------------------------------------------------------------------------------------------------------------------
