@@ -345,7 +345,7 @@ def update_df(dataframe, list_updated):
 #         return np.array(updates)
 
 
-def sample_excerpts(dataframe, stoppers,size):
+def sample_excerpts(dataframe, stoppers, size):
     """
     Function that receives a DataFrame and creates subsets of ~500 words of each
     string in its "text" column.
