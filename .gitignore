@@ -2,6 +2,7 @@
 .idea/
 submission.csv
 outputs/*
+outputs_pre/*
 #nlp_data.zip
 
 # Byte-compiled / optimized / DLL files
