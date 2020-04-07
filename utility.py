@@ -237,7 +237,7 @@ def update_df(dataframe, list_updated):
     dataframe.update(pd.Series(list_updated, name="text"))  # Modify in place using non-NA values from another DataFrame
 
 
-def sample_excerpts(dataframe, stoppers):
+def sample_excerpts(dataframe, stoppers,size):
     """
     Function that receives a DataFrame and creates subsets of ~500 words of each
     string in its "text" column.
@@ -255,12 +255,20 @@ def sample_excerpts(dataframe, stoppers):
         group = []
         for word in words:
             group.append(word)
-            if (len(group) >= 485) & (group[-1] in stoppers):
-                groups.append((row["book_id"], row["author"], " ".join(group)))
-                group = []
-            elif len(group) >= 600:  # Dealing with lack of punctuation
-                groups.append((row["book_id"], row["author"], " ".join(group)))
-                group = []
+            if size == 'short':
+                if (len(group) >= 485) & (group[-1] in stoppers):
+                    groups.append((row["book_id"], row["author"], " ".join(group)))
+                    group = []
+                elif len(group) >= 600:  # Dealing with lack of punctuation
+                    groups.append((row["book_id"], row["author"], " ".join(group)))
+                    group = []
+            elif size == 'large':
+                if (len(group) >= 980) & (group[-1] in stoppers):
+                    groups.append((row["book_id"], row["author"], " ".join(group)))
+                    group = []
+                elif len(group) >= 1100:  # Dealing with lack of punctuation
+                    groups.append((row["book_id"], row["author"], " ".join(group)))
+                    group = []
         data += groups
     return pd.DataFrame(data, columns=["book_id", "author", "text"])
 

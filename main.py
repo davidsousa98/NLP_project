@@ -81,7 +81,8 @@ non_alphanum = non_alphanum.loc[~non_alphanum.isna()]
 # Sampling Excerpts
 # ----------------------------------------------------------------------------------------------------------------------
 train_excerpt_df = sample_excerpts(dataframe=train_df,
-                                   stoppers=[".", "...", "!", "?"])
+                                   stoppers=[".", "...", "!", "?"],
+                                   size= 'large') #short = 500 or large = 1000
 # creating number of words column
 train_excerpt_df["word_count"] = train_excerpt_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
 train_excerpt_df["word_count"].describe()  # word count mean is around 500
@@ -126,11 +127,92 @@ train_excerpt_df["word_count"].describe()  # word count mean is around 500
 # Reference: https://www.kdnuggets.com/2018/01/managing-machine-learning-workflows-scikit-learn-pipelines-part-3.html
 X = np.array(train_excerpt_df["text"])
 y = np.array(train_excerpt_df["author"])
+
+
+# #Word Embedding
+# from nltk import word_tokenize
+# from torch.autograd import Variable
+# import torch.nn.functional as F
+# import torch
+#
+#
+# def build_training(tokenized_corpus, word2idx, window_size=2):
+#     window_size = 2
+#     idx_pairs = []
+#     indices =[]
+#
+#     # for each sentence
+#     for word in tokenized_corpus:
+#         indices.append(word2idx[word])
+#         # for each word, threated as center word
+#         for center_word_pos in range(len(indices)):
+#             # for each window position
+#             for w in range(-window_size, window_size + 1):
+#                 context_word_pos = center_word_pos + w
+#                 # make soure not jump out sentence
+#                 if context_word_pos < 0 or \
+#                         context_word_pos >= len(indices) or \
+#                         center_word_pos == context_word_pos:
+#                     continue
+#                 context_word_idx = indices[context_word_pos]
+#                 idx_pairs.append((indices[center_word_pos], context_word_idx))
+#     return np.array(idx_pairs)
+#
+#
+# def get_onehot_vector(word_idx, vocabulary):
+#     x = torch.zeros(len(vocabulary)).float()
+#     x[word_idx] = 1.0
+#     return x
+#
+#
+# def Skip_Gram(training_pairs, vocabulary, embedding_dims=5, learning_rate=0.001, epochs=10):
+#     torch.manual_seed(3)
+#     W1 = Variable(torch.randn(embedding_dims, len(vocabulary)).float(), requires_grad=True)
+#     losses = []
+#     for epo in (range(epochs)):
+#         loss_val = 0
+#         for input_word, target in training_pairs:
+#             x = Variable(get_onehot_vector(input_word, vocabulary)).float()
+#             y_true = Variable(torch.from_numpy(np.array([target])).long())
+#
+#             # Matrix multiplication to obtain the input word embedding
+#             z1 = torch.matmul(W1, x)
+#
+#             # Matrix multiplication to obtain the z score for each word
+#             z2 = torch.matmul(torch.transpose(W1, 0, 1), z1)
+#
+#             # Apply Log and softmax functions
+#             log_softmax = F.log_softmax(z2, dim=0)
+#             # Compute the negative-log-likelihood loss
+#             loss = F.nll_loss(log_softmax.view(1, -1), y_true)
+#             loss_val += loss.item()
+#
+#             # compute the gradient in function of the error
+#             loss.backward()
+#
+#             # Update your embeddings
+#             W1.data -= learning_rate * W1.grad.data
+#             W1.grad.data.zero_()
+#
+#         losses.append(loss_val / len(training_pairs))
+#
+#     return W1, losses
+#
+#
+# tokenized_corpus = word_tokenize(X[0])
+# word2idx = {w:idx for (idx, w) in enumerate(tokenized_corpus)}
+#
+# training_pairs = build_training(tokenized_corpus, word2idx)
+#
+# W1, losses = Skip_Gram(training_pairs, word2idx)
+
+
 X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                     test_size=0.3,
                                                     random_state=15,
                                                     shuffle=True,
                                                     stratify=y)
+
 
 # Construct some pipelines
 pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
@@ -150,7 +232,7 @@ pipe_cv_knc = Pipeline([('cv', CountVectorizer()),
 
 pipe_tfidf_knc = Pipeline([('tfidf', TfidfVectorizer()),
                            ('knc', NearestCentroid())])
-
+#
 pipe_cv_log = Pipeline([('cv', CountVectorizer()),
                         ('log', SGDClassifier(random_state=15))])
 
@@ -162,7 +244,7 @@ pipe_cv_sgd = Pipeline([('cv', CountVectorizer()),
 
 pipe_tfidf_sgd = Pipeline([('tfidf', TfidfVectorizer()),
                            ('sgd', SGDClassifier(random_state=15))])
-
+#
 pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
                         ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
@@ -177,8 +259,8 @@ pipe_tfidf_lsvc = Pipeline([('cv', TfidfVectorizer()),
 
 pipe_cv_mlpc = Pipeline([('cv', CountVectorizer()),
                          ('mlpc', MLPClassifier(random_state=15))])
-
-pipe_tfidf_mlpc = Pipeline([('cv', TfidfVectorizer()),
+#
+pipe_tfidf_mlpc = Pipeline([('tfidf', TfidfVectorizer()),
                             ('mlpc', MLPClassifier(random_state=15))])
 
 pipe_cv_pac = Pipeline([('cv', CountVectorizer()),
@@ -245,14 +327,14 @@ grid_params_cv_sgd = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
                        "sgd__penalty": ['l2', 'elasticnet'],
-                       "sgd__loss:": ["modified_huber", "squared_hinge", "perceptron"]}]
+                       "sgd__loss": ["squared_hinge","modified_huber","perceptron"]}]
 
 grid_params_tfidf_sgd = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
                           "sgd__penalty": ['l2', 'elasticnet'],
-                          "sgd__loss:": ["modified_huber", "squared_hinge", "perceptron"]}]
+                          "sgd__loss": ["squared_hinge","modified_huber","perceptron"]}]
 
 grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
@@ -296,7 +378,7 @@ grid_params_tfidf_mlpc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                            "mlpc__activation": ['tanh', 'relu'],
                            'mlpc__alpha': [0.0001, 0.05],
                            'mlpc__learning_rate': ['constant', 'adaptive']}]
-
+#
 grid_params_cv_pac = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
@@ -351,7 +433,7 @@ gs_tfidf_knc = GridSearchCV(estimator=pipe_tfidf_knc,
                             scoring=scoring,
                             cv=cv,
                             n_jobs=jobs)
-
+#
 gs_cv_log = GridSearchCV(estimator=pipe_cv_log,
                          param_grid=grid_params_cv_log,
                          scoring=scoring,
@@ -405,7 +487,7 @@ gs_cv_mlpc = GridSearchCV(estimator=pipe_cv_mlpc,
                           scoring=scoring,
                           cv=cv,
                           n_jobs=jobs)
-
+#
 gs_tfidf_mlpc = GridSearchCV(estimator=pipe_tfidf_mlpc,
                              param_grid=grid_params_tfidf_mlpc,
                              scoring=scoring,
@@ -434,6 +516,21 @@ grid_labels = ["cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_knc", "tfidf_kn
                "cv_rfc", "tfidf_rfc", "cv_sgd", "tfidf_sgd", "cv_lsvc", "tfidf_lsvc", "cv_mlpc", "tfidf_mlpc",
                "cv_pac", "tfidf_pac"]
 
+# pipe_cv_mlpc.set_params(cv__max_df=0.8,
+#                         cv__binary=True,
+#                         cv__stop_words=[".", "...", "!", "?"],
+#                         cv__ngram_range=(1, 2),
+#                         mlpc__hidden_layer_sizes=(50, 50),
+#                         mlpc__activation='tanh',
+#                         mlpc__alpha=0.0001,
+#                         mlpc__learning_rate='adaptive').fit(X_train,y_train)
+#
+# y_pred = pipe_cv_mlpc.predict(X_test)
+# recall_score(y_test, y_pred, average='macro')
+
+
+
+########################################################################################################################
 # Model Selection - Running Grid Searches
 model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
 
@@ -451,13 +548,14 @@ gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
 gs_cv_sgd = load("./outputs/Pipeline_cv_sgd.pkl")
 gs_tfidf_sgd = load("./outputs/Pipeline_tfidf_sgd.pkl")
 gs_cv_lsvc = load("./outputs/Pipeline_cv_lsvc.pkl")
-gs_tfidf_lsvc = load("./outputs/Pipeline_tfidf_lsvc.pkl")
+# gs_tfidf_lsvc = load("./outputs/Pipeline_tfidf_lsvc.pkl")
 gs_cv_mlpc = load("./outputs/Pipeline_cv_mlpc.pkl")
 gs_tfidf_mlpc = load("./outputs/Pipeline_tfidf_mlpc.pkl")
 gs_cv_pac = load("./outputs/Pipeline_cv_pac.pkl")
 gs_tfidf_pac = load("./outputs/Pipeline_tfidf_pac.pkl")
 
 # Ensemble
+# Reference: https://scikit-learn.org/stable/modules/ensemble.html
 
 # AdaBoost
 clf = AdaBoostClassifier(base_estimator=[gs_cv_knc, gs_tfidf_knn], n_estimators=100, algorithm='SAMME', random_state=15)
@@ -480,11 +578,14 @@ sclf = StackingCVClassifier(classifiers=[gs_cv_knc, gs_tfidf_knn],
 sclf.fit(X_train, y_train)
 y_pred = sclf.predict(y_test)
 
-models_list = [gs_cv_cnb,gs_tfidf_cnb,gs_cv_knn, gs_tfidf_knn,gs_cv_log,gs_tfidf_log,gs_cv_rfc,gs_tfidf_rfc,gs_cv_knc,gs_tfid_knc]
-models_labels = ['cv_cnb', 'tfidf_cnb','cv_knn','tfidf_knn','cv_log','tfidf_log','cv_rfc','tfidf_rfc','cv_knc','tfidf_knc']
 
-models_comb = list(itertools.combinations(models_list, 4))
-labels_comb = list(itertools.combinations(models_labels, 4))
+# ENSEMBLE - VoteClassifier:
+
+models_list = [gs_cv_cnb,gs_tfidf_cnb,gs_cv_knn, gs_tfidf_knn,gs_cv_log,gs_tfidf_log,gs_cv_rfc,gs_tfidf_rfc,gs_cv_knc,gs_tfid_knc,gs_cv_sgd,gs_tfidf_sgd]
+models_labels = ['cv_cnb', 'tfidf_cnb','cv_knn','tfidf_knn','cv_log','tfidf_log','cv_rfc','tfidf_rfc','cv_knc','tfidf_knc','cv_sgd','tfidf_sgd']
+
+models_comb = list(itertools.combinations(models_list, 3))  #create all possible combinations of models
+labels_comb = list(itertools.combinations(models_labels, 3)) #create all possible combinations of labels
 
 
 score = []
@@ -500,9 +601,8 @@ for i in models_comb:
 print('The top 3 models are: ' , results, sep = '\n')
 
 
-# sorted(zip(score, models_labels), reverse=True)[:2])
-#
-# ensemble = EnsembleVoteClassifier(clfs=[gs_tfidf_knn,gs_cv_log,gs_cv_knc],
+# #
+# ensemble = EnsembleVoteClassifier(clfs=[gs_cv_log, gs_cv_knc, gs_cv_sgd],
 #                                   voting='hard', refit=False)
 #
 # ensemble.fit(X_train, y_train)
@@ -531,7 +631,7 @@ model_assessment_vis(xlsx_path, labels)
 
 y_pred = gs_tfidf_knn.predict(X_test)
 
-classification_report(y_test, y_pred, target_names=list(np.unique(y_test)))
+c = classification_report(y_test, y_pred, target_names=list(np.unique(y_test)))
 
 # plot confusion matrix
 plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
