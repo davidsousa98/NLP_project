@@ -1,5 +1,5 @@
 from utility import get_files_zip, read_txt_zip, TextCleaner, update_df, sample_excerpts, visualize_groups, plot_cm, \
-    word_counter, save_excel, get_top_n_grams, model_selection, model_assessment_vis, RepeatedStratifiedGroupKFold
+    model_selection, model_assessment_vis
 from joblib import load
 import itertools
 import numpy as np
@@ -7,8 +7,6 @@ import pandas as pd
 import re
 import nltk
 from nltk.corpus import stopwords
-from imblearn.under_sampling import RandomUnderSampler
-from imblearn.over_sampling import RandomOverSampler
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.naive_bayes import ComplementNB
@@ -23,13 +21,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.classifier import StackingCVClassifier
-
-
 # nltk.download('rslp')
 # nltk.download('punkt')
 
-# TODO: Join some adjacent texts belonging to same book to obtain 1000 word excerpts
-# TODO: Perform ensemble on best models
 # TODO: Use word2vec to represent words
 
 
@@ -46,16 +40,25 @@ train_df["author"] = train_df["file"].apply(lambda x: re.findall(r"/([a-zA-Z]+)/
 train_df["book_id"] = train_df["file"].str.extract(r"/.+/(.+).txt")
 train_df = train_df[["file", "book_id", "author", "text"]]
 
-# Creating test_df
+# Creating submission_df
 submission_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
 
+# Word count
+train_df["word_count"] = train_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
+
+# Train_test split
+X, y = train_df["text"], train_df["author"]
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                    test_size=0.3,
+                                                    random_state=5,
+                                                    shuffle=True,
+                                                    stratify=y)
+
+# Proportion of words in X_train: 0.707
+train_df.loc[train_df.index.isin(X_train.index), "word_count"].sum()/train_df["word_count"].sum()
+#
 # Preprocessing - Reference: http://www.nltk.org/howto/portuguese_en.html
 # ----------------------------------------------------------------------------------------------------------------------
-# TextCleaner behaves like a sklearn estimator. We built it this way only after realising we could integrate it in a
-# sklearn Pipeline. However we realised afterwards that this would only work if we would have produced the excerpts
-# before the cleaning instead of after. This would generate different data and since we had already fitted some models
-# with the previous data we decided not to include it. However everything is built in order to integrate it in the
-# Pipeline and fit a GridSearch to find out the overall best combination of parameters
 
 cleaner = TextCleaner(
     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_', '`', '{', '|',
@@ -68,92 +71,50 @@ cleaner = TextCleaner(
 updates = cleaner.transform(train_df["text"])
 update_df(train_df, updates)
 
-# Data Exploration
-# ----------------------------------------------------------------------------------------------------------------------
-# See Keyword Extraction Notebook (words frequency, top unigrams, bigrams, ...)
-# Obtaining word frequency, token frequency and finding non alphanumeric characters
-word_freq = word_counter(train_df["text"].to_list())  # possibly we should remove some more punctuation
-token_freq = word_freq.loc[word_freq.index.str.contains("#")]
-non_alphanum = word_freq.index.str.extract("([^a-zA-Z0-9])")[0]
-non_alphanum = non_alphanum.loc[~non_alphanum.isna()]
+#
+# # cleaner reduces the number of words proportionally
+# train_df["word_count_clean"] = train_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
+# from matplotlib import pyplot as plt
+# fig, ax = plt.subplots()
+# ax.scatter(train_df["word_count"], train_df["word_count_clean"])
+# diag_line, = ax.plot(ax.get_xlim(), ax.get_ylim(), ls="--", c=".3")
+# plt.axis('equal')
+# plt.show()
+#
 
 # Sampling Excerpts
 # ----------------------------------------------------------------------------------------------------------------------
-train_excerpt_df = sample_excerpts(dataframe=train_df,
-                                   stoppers=[".", "...", "!", "?"])
+train_excerpt_df = sample_excerpts(dataframe=train_df, stoppers=[".", "...", "!", "?"])
+
 # creating number of words column
 train_excerpt_df["word_count"] = train_excerpt_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
 train_excerpt_df["word_count"].describe()  # word count mean is around 500
 
-# # visualize excerpt partition according to Books and Authors
-# visualize_groups(train_excerpt_df["author"], train_excerpt_df["book_id"])  # by visualizing the plot we can understand
-# # that we can't just do a stratified train_test_split as it will end up with excerpts from the same book in both the
-# # training and test set leading to the problem of data leakage.
+# visualize excerpt partition according to Books and Authors
+visualize_groups(train_excerpt_df["author"], train_excerpt_df["book_id"])  # by visualizing the plot we can understand
+# that we can't just do a stratified train_test_split as it will end up with excerpts from the same book in both the
+# training and test set leading to the problem of data leakage.
 
-# Balancing the excerpts according to the target population distribution
-# original_props = {"JoseRodriguesSantos": 52,
-#                   "JoseSaramago": 79,
-#                   "CamiloCasteloBranco": 131,
-#                   "EcaDeQueiros": 33,
-#                   "AlmadaNegreiros": 59,
-#                   "LuisaMarquesSilva": 59}
-# rus = RandomUnderSampler(random_state=15, sampling_strategy=original_props)
-# X_res, y_res = rus.fit_resample(train_excerpt_df.drop("author", axis=1), train_excerpt_df["author"])
-# train_excerpt_df = pd.concat([X_res, y_res], axis=1)
-# train_excerpt_df["author"].value_counts()/train_excerpt_df.shape[0]
-# train_df["author"].value_counts()/train_df.shape[0]
-
-# # Train / Test split
-# X_train, X_test, y_train, y_test = train_test_split(train_excerpt_df['text'],
-#                                                     train_excerpt_df['author'],
-#                                                     test_size=0.3,
-#                                                     random_state=15,
-#                                                     shuffle=True,
-#                                                     stratify=train_excerpt_df['author'])
-#
-# # Oversampling
-# X_temp = X_train.loc[(y_train == 'AlmadaNegreiros') | (y_train == 'LuisaMarquesSilva')].values.reshape(-1, 1)
-# y_temp = y_train.loc[(y_train == 'AlmadaNegreiros') | (y_train == 'LuisaMarquesSilva')].values.reshape(-1, 1)
-#
-# author_weights = {"AlmadaNegreiros": 200, "LuisaMarquesSilva": 200}
-# ros = RandomOverSampler(sampling_strategy=author_weights, random_state=15)
-# X_res, y_res = ros.fit_resample(X_temp, y_temp)
-#
-# max_index = train_excerpt_df.index.max() + 1
-# X_train = X_train.append(pd.Series(X_res.flatten(), index=pd.RangeIndex(start=max_index,
-#                                                                         stop=max_index + sum(author_weights.values()))))
-# y_train = y_train.append(pd.Series(y_res.flatten(), index=pd.RangeIndex(start=max_index,
-#                                                                         stop=max_index + sum(author_weights.values()))))
-#
 # Model Selection
 # ----------------------------------------------------------------------------------------------------------------------
 # Reference: https://www.kdnuggets.com/2018/01/managing-machine-learning-workflows-scikit-learn-pipelines-part-3.html
 # Train test split with stratification and same book restriction
-# # Grouping by book_id - like each observation were a book instead of an excerpt
-# groupby = train_excerpt_df[["book_id", "author"]].groupby(by="book_id").first()
-# X_groupby, y_groupby = groupby.index, groupby["author"].values
-# X_groupby_train, X_groupby_test, _, _ = train_test_split(X_groupby, y_groupby,
-#                                                          test_size=0.3,
-#                                                          random_state=0,
-#                                                          shuffle=True,
-#                                                          stratify=y_groupby)
-#
-# # Obtaining the shuffled excerpt partitions and the group labels for the train data for future cross validation
-# train_df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_train), ["text", "author", "book_id"]].\
-#     sample(frac=1, random_state=15).reset_index(drop=True)
-# test_df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_test), ["text", "author", "book_id"]].\
-#     sample(frac=1, random_state=15).reset_index(drop=True)
-# X_train, y_train, g_train = train_df["text"], train_df["author"], train_df["book_id"]
-# X_test, y_test = test_df["text"], test_df["author"]
+# Grouping by book_id - like each observation were a book instead of an excerpt
+groupby = train_excerpt_df[["book_id", "author"]].groupby(by="book_id").first()
+X_groupby, y_groupby = groupby.index, groupby["author"].values
+X_groupby_train, X_groupby_test, _, _ = train_test_split(X_groupby, y_groupby,
+                                                         test_size=0.3,
+                                                         random_state=0,
+                                                         shuffle=True,
+                                                         stratify=y_groupby)
 
-# Regular train test split
-X = train_excerpt_df["text"]
-y = train_excerpt_df["author"]
-X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                    test_size=0.3,
-                                                    random_state=15,
-                                                    shuffle=True,
-                                                    stratify=y)
+# Obtaining the shuffled excerpt partitions and the group labels for the train data for future cross validation
+train_df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_train), ["text", "author", "book_id"]].\
+    sample(frac=1, random_state=15)
+test_df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_test), ["text", "author", "book_id"]].\
+    sample(frac=1, random_state=15)
+X_train, y_train, g_train = train_df["text"], train_df["author"], train_df["book_id"]
+X_test, y_test = test_df["text"], test_df["author"]
 
 # Construct some pipelines
 pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
@@ -192,11 +153,11 @@ pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
 pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
                            ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
-pipe_cv_mlpc = Pipeline([('cv', CountVectorizer(ngram_range=(1, 2), stopwords=[".", "...", "!", "?"])),
+pipe_cv_mlpc = Pipeline([('cv', CountVectorizer(ngram_range=(1, 2), stop_words=[".", "...", "!", "?"])),
                          ('mlpc', MLPClassifier(hidden_layer_sizes=(50, 50), learning_rate="adaptive",
                                                 random_state=15))])
 
-pipe_tfidf_mlpc = Pipeline([('cv', TfidfVectorizer(ngram_range=(1, 2), stopwords=[".", "...", "!", "?"])),
+pipe_tfidf_mlpc = Pipeline([('cv', TfidfVectorizer(ngram_range=(1, 2), stop_words=[".", "...", "!", "?"])),
                             ('mlpc', MLPClassifier(hidden_layer_sizes=(50, 50), learning_rate="adaptive",
                                                    random_state=15))])
 
@@ -426,6 +387,7 @@ grid_labels = ["cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_log", "tfidf_lo
 # Model Selection - Running Grid Searches
 model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
 
+
 # Load pickle files with fitted models
 gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
 gs_tfidf_cnb = load("./outputs/Pipeline_tfidf_cnb.pkl")
@@ -517,8 +479,7 @@ xlsx_path = './outputs/Pipelines.xlsx'
 model_assessment_vis(xlsx_path, labels)
 
 y_pred = gs_tfidf_knn.predict(X_test)
-
-classification_report(y_test, y_pred, target_names=list(np.unique(y_test)))
+print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
 
 # plot confusion matrix
 plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))

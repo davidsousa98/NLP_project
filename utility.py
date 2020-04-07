@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 import os
 import zipfile as zp
@@ -17,12 +17,17 @@ from string import punctuation as punct
 from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk import word_tokenize
+from nltk.stem import SnowballStemmer, RSLPStemmer
 from sklearn.metrics import recall_score
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.base import BaseEstimator, TransformerMixin
 from joblib import dump
 import plotly.graph_objects as go
 import plotly.offline as pyo
+from collections import Counter, defaultdict
+
+from sklearn.model_selection._split import _BaseKFold, _RepeatedSplits
+from sklearn.utils import check_random_state
 
 
 def get_files_zip():
@@ -58,20 +63,28 @@ def read_txt_zip(files):
 class TextCleaner(BaseEstimator, TransformerMixin):
 
     # Class Constructor
-    def __init__(self, punctuation, stoppers, stopwords, accentuation=True, lemmatizer=None, stemmer=None):
+    def __init__(self, punctuation, stoppers, stopwords, accentuation=True, stemmer="Snowball"):
         """
             :param punctuation: list of punctuation to exclude in the text.
             :param stoppers: list of punctuation that defines the end of an excerpt.
             :param stopwords: list of stopwords to exclude.
             :accentuation: whether or not to exclude word accentuation.
-            :param lemmatizer: lemmatizer to apply if provided.
-            :param stemmer: stemmer to apply if provided.
+            :param stemmer: "RSLP" applies RSLPStemmer('portuguese'), whereas "Snowball" applies
+            SnowballStemmer('portuguese') (default). None value doesn't apply any Stemmer.
         """
         self._punctuation = punctuation
         self._stoppers = stoppers
         self._stopwords = stopwords
-        self._lemmatizer = lemmatizer
-        self._stemmer = stemmer
+        if stemmer:
+            if stemmer == "Snowball":
+                self._stemmer = SnowballStemmer('portuguese')
+            elif stemmer == "RSLP":
+                self._stemmer = RSLPStemmer('portuguese')
+            else:
+                print("Invalid value for stemmer parameter. Default value will be used.")
+                self._stemmer = SnowballStemmer('portuguese')
+        else:
+            self._stemmer = stemmer
         self._accentuation = accentuation
 
 
@@ -130,12 +143,8 @@ class TextCleaner(BaseEstimator, TransformerMixin):
             # REMOVE HTML TAGS
             text = BeautifulSoup(text, features="lxml").get_text()
 
-            if self._lemmatizer:
-                text = " ".join(self._lemmatizer.lemmatize(word) for word in text.split())
-
+            # APPLIES STEMMING
             if self._stemmer:
-                # stemmer = nltk.stem.RSLPStemmer()
-                # stemmer = nltk.stem.SnowballStemmer('portuguese')
                 text = " ".join(self._stemmer.stem(word) for word in text.split())
 
             # REMOVING ACCENTUATION
@@ -145,6 +154,16 @@ class TextCleaner(BaseEstimator, TransformerMixin):
             updates.append(text)
 
         return np.array(updates)
+
+
+def update_df(dataframe, list_updated):
+    """
+    Function that updates a DataFrame's "text" column inplace.
+
+    :param dataframe: DataFrame to update.
+    :param list_updated: list to replace the "text" column.
+    """
+    dataframe.update(pd.Series(list_updated, name="text"))  # Modify in place using non-NA values from another DataFrame
 
 
 # def clean(text_list, punctuation, stoppers, lemmatize=None, stemmer=None):
@@ -226,15 +245,104 @@ class TextCleaner(BaseEstimator, TransformerMixin):
 #
 #     return updates
 
-
-def update_df(dataframe, list_updated):
-    """
-    Function that updates a DataFrame's "text" column inplace.
-
-    :param dataframe: DataFrame to update.
-    :param list_updated: list to replace the "text" column.
-    """
-    dataframe.update(pd.Series(list_updated, name="text"))  # Modify in place using non-NA values from another DataFrame
+# class ExcerptCreator(BaseEstimator, TransformerMixin):
+#
+#     # Class Constructor
+#     def __init__(self, stoppers, size):
+#         """
+#             :param punctuation: list of punctuation to exclude in the text.
+#             :param stoppers: list of punctuation that defines the end of an excerpt.
+#             :param stopwords: list of stopwords to exclude.
+#             :accentuation: whether or not to exclude word accentuation.
+#             :param stemmer: "RSLP" applies RSLPStemmer('portuguese'), whereas "Snowball" applies
+#             SnowballStemmer('portuguese') (default). None value doesn't apply any Stemmer.
+#         """
+#         self._size = size
+#         self._stoppers = stoppers
+#
+#     # Return self nothing else to do here
+#     def fit(self, X, y=None):
+#         return self
+#
+#     # Method that describes what we need this transformer to do
+#     def transform(self, X, y=None):
+#         """
+#             :param X: numpy array with texts for cleaning
+#         """
+#
+#         data = []
+#         for _, row in dataframe.iterrows():
+#             words = word_tokenize(row["text"])
+#             groups = []
+#             group = []
+#             for word in words:
+#                 group.append(word)
+#                 if (len(group) >= 485) & (group[-1] in stoppers):
+#                     groups.append((row["book_id"], row["author"], " ".join(group)))
+#                     group = []
+#                 elif len(group) >= 600:  # Dealing with lack of punctuation
+#                     groups.append((row["book_id"], row["author"], " ".join(group)))
+#                     group = []
+#             data += groups
+#         return pd.DataFrame(data, columns=["book_id", "author", "text"])
+#
+#         url = "https://simplemaps.com/static/data/country-cities/pt/pt.csv"
+#         cities = pd.read_csv(io.StringIO(requests.get(url).content.decode('utf-8')))["city"].to_list()
+#         cities.append("lisboa")
+#         cities = list(map(lambda x: x.lower(), cities))
+#         week_days = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado',
+#                      'domingo']
+#         updates = []
+#         for j in X:
+#             # LOWERCASING
+#             text = j.lower()
+#
+#             # REMOVING # SIGN (don't remove with punctuation as it will destroy tokens)
+#             text = text.replace("#", " ")
+#
+#             # TOKENIZATION
+#             text = re.sub('\S+\$\d+( réis)*', ' #PRICE ', text)  # price token
+#             text = re.sub('(\d{1,2}\D\d{1,2}\D\d{2,4})|(\d{4}\D\d{1,2}\D\d{1,2})|(\d{1,2} de [a-zA-Z]+ de \d{2,4})',
+#                           " #DATE ", text)  # date token
+#             text = re.sub('[0-9]+', ' #NUMBER ', text)  # number token
+#             # cities token
+#             for i in cities:
+#                 if i in text:
+#                     text = text.replace(i, ' #CITY ')
+#             # week days token
+#             for i in week_days:
+#                 if i in text:
+#                     text = text.replace(i, ' #WDAY ')
+#
+#             # REMOVE PUNCTUATION, SEPARATE KEEP PUNCTUATION WITH SPACES AND KEEP TOKENS #
+#             def repl(matchobj):
+#                 keep_punct = list(set(punct) - (set(self._punctuation) - set(self._stoppers)) - set("#"))
+#                 if matchobj.group(0) in keep_punct:
+#                     return " {} ".format(matchobj.group(0))
+#                 elif matchobj.group(0) == "#":
+#                     return '#'
+#                 else:
+#                     return ' '
+#
+#             text = re.sub("([^a-zA-Z0-9])", repl, text)
+#
+#             # REMOVE STOPWORDS
+#             text = " ".join(" " if word in self._stopwords else word for word in text.split())
+#
+#             # REMOVE HTML TAGS
+#             text = BeautifulSoup(text, features="lxml").get_text()
+#
+#             # APPLIES STEMMING
+#             if self._stemmer:
+#                 text = " ".join(self._stemmer.stem(word) for word in text.split())
+#
+#             # REMOVING ACCENTUATION
+#             if self._accentuation:
+#                 text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+#
+#             updates.append(text)
+#
+#         return np.array(updates)
 
 
 def sample_excerpts(dataframe, stoppers):
@@ -263,6 +371,85 @@ def sample_excerpts(dataframe, stoppers):
                 group = []
         data += groups
     return pd.DataFrame(data, columns=["book_id", "author", "text"])
+
+
+def visualize_groups(classes, groups):
+    """
+    Function that visualizes the partitions in the data made by the classes and existing groups.
+
+    :param classes: Series corresponding to the target classes.
+    :param groups: Series corresponding to the existing groups.
+    """
+    y, _ = classes.factorize()
+    j = y[0]
+    y_index = [0]
+    for n, i in enumerate(y):
+        if i != j:
+            y_index.append(n)
+        j = i
+    y_index.append(len(y))
+
+    g, _ = groups.factorize()
+    j = g[0]
+    g_index = [0]
+    for n, i in enumerate(g):
+        if i != j:
+            g_index.append(n)
+        j = i
+    g_index.append(len(g))
+
+    # Visualize dataset groups
+    fig, ax = plt.subplots()
+    ax.vlines(g_index, 0.5, 1, colors="darkorange", linestyles="solid", label="Groups", lw=1)
+    ax.vlines(y_index, 0.5, 1, colors="darkblue", linestyles="dashed", label="Classes")
+    ax.legend()
+    ax.set_ylim(0, 1.5)
+    ax.get_yaxis().set_visible(False)
+    ax.set_xlabel("Sample index")
+    return fig.show()
+
+
+def plot_cv_indices(cv, X, y, group, n_splits, lw=10):
+    """
+    Create a sample plot for indices of a cross-validation object. Visualize how the cross-validation partitions the
+    data.
+
+    :param cv: cross_validation object.
+    :param X: data to partition with cv.
+    :param y: class labels to partition with.
+    :param group: group labels to partition with.
+    :param n_splits: number of folds.
+    :param lw: line width.
+    """
+    cmap_cv = plt.cm.coolwarm
+    cmap_data = plt.cm.Paired
+    fig, ax = plt.subplots()
+    # Generate the training/testing visualizations for each CV split
+    for ii, (tr, tt) in enumerate(cv.split(X=X, y=y, groups=group)):
+        # Fill in indices with the training/test groups
+        indices = np.array([np.nan] * len(X))
+        indices[tt] = 1
+        indices[tr] = 0
+
+        # Visualize the results
+        ax.scatter(range(len(indices)), [ii + .5] * len(indices),
+                   c=indices, marker='_', lw=lw, cmap=cmap_cv,
+                   vmin=-.2, vmax=1.2)
+
+    # Plot the data classes and groups at the end
+    ax.scatter(range(len(X)), [ii + 1.5] * len(X),
+               c=y, marker='_', lw=lw, cmap=cmap_data)
+
+    ax.scatter(range(len(X)), [ii + 2.5] * len(X),
+               c=group, marker='_', lw=lw, cmap=cmap_data)
+
+    # Formatting
+    yticklabels = list(range(n_splits)) + ['class', 'group']
+    ax.set(yticks=np.arange(n_splits+2) + .5, yticklabels=yticklabels,
+           xlabel='Sample index', ylabel="CV iteration",
+           ylim=[n_splits+2.2, -.2])
+    ax.set_title('{}'.format(type(cv).__name__), fontsize=15)
+    return fig.show()
 
 
 def plot_cm(confusion_matrix: np.array, class_names: list):
@@ -469,3 +656,256 @@ def model_assessment_vis(path, labels):
     )
 
     return pyo.plot(fig)
+
+
+# class RepeatedStratifiedGroupKFold():
+#     """
+#     This ensures that excerpts belonging to the same book will always be in the same fold and that the proportion of
+#     samples for each class is the same in all the folds.
+#     https://github.com/scikit-learn/scikit-learn/issues/13621#issuecomment-557802602
+#
+#     :param n_splits: number of folds to produce (default = 5).
+#     :param n_repeats: number of times each fold is used as validation (default = 1).
+#     :param random_state: random state for reproducibility.
+#     """
+#
+#     def __init__(self, n_splits=5, n_repeats=1, random_state=None):
+#         self.n_splits = n_splits
+#         self.n_repeats = n_repeats
+#         self.random_state = random_state
+#
+#     # Implementation based on this kaggle kernel:
+#     #    https://www.kaggle.com/jakubwasikowski/stratified-group-k-fold-cross-validation
+#     def split(self, X, y=None, groups=None):
+#         k = self.n_splits
+#
+#         def eval_y_counts_per_fold(y_counts, fold):
+#             y_counts_per_fold[fold] += y_counts
+#             std_per_label = []
+#             for label in range(labels_num):
+#                 label_std = np.std(
+#                     [y_counts_per_fold[i][label] / y_distr[label] for i in range(k)]
+#                 )
+#                 std_per_label.append(label_std)
+#             y_counts_per_fold[fold] -= y_counts
+#             return np.mean(std_per_label)
+#
+#         rnd = check_random_state(self.random_state)
+#         for repeat in range(self.n_repeats):
+#             labels_num = np.max(y) + 1
+#             y_counts_per_group = defaultdict(lambda: np.zeros(labels_num))
+#             y_distr = Counter()
+#             for label, g in zip(y, groups):
+#                 y_counts_per_group[g][label] += 1
+#                 y_distr[label] += 1
+#
+#             y_counts_per_fold = defaultdict(lambda: np.zeros(labels_num))
+#             groups_per_fold = defaultdict(set)
+#
+#             groups_and_y_counts = list(y_counts_per_group.items())
+#             rnd.shuffle(groups_and_y_counts)
+#
+#             for g, y_counts in sorted(groups_and_y_counts, key=lambda x: -np.std(x[1])):
+#                 best_fold = None
+#                 min_eval = None
+#                 for i in range(k):
+#                     fold_eval = eval_y_counts_per_fold(y_counts, i)
+#                     if min_eval is None or fold_eval < min_eval:
+#                         min_eval = fold_eval
+#                         best_fold = i
+#                 y_counts_per_fold[best_fold] += y_counts
+#                 groups_per_fold[best_fold].add(g)
+#
+#             all_groups = set(groups)
+#             for i in range(k):
+#                 train_groups = all_groups - groups_per_fold[i]
+#                 test_groups = groups_per_fold[i]
+#
+#                 train_indices = [i for i, g in enumerate(groups) if g in train_groups]
+#                 test_indices = [i for i, g in enumerate(groups) if g in test_groups]
+#
+#                 yield train_indices, test_indices
+
+
+class StratifiedGroupKFold(_BaseKFold):
+    """Stratified K-Folds iterator variant with non-overlapping groups.
+
+    This cross-validation object is a variation of StratifiedKFold that returns
+    stratified folds with non-overlapping groups. The folds are made by
+    preserving the percentage of samples for each class.
+
+    The same group will not appear in two different folds (the number of
+    distinct groups has to be at least equal to the number of folds).
+
+    The difference between GroupKFold and StratifiedGroupKFold is that
+    the former attempts to create balanced folds such that the number of
+    distinct groups is approximately the same in each fold, whereas
+    StratifiedGroupKFold attempts to create folds which preserve the
+    percentage of samples for each class.
+
+    Read more in the :ref:`User Guide <cross_validation>`.
+
+    Parameters
+    ----------
+    n_splits : int, default=5
+        Number of folds. Must be at least 2.
+
+    shuffle : bool, default=False
+        Whether to shuffle each class's samples before splitting into batches.
+        Note that the samples within each split will not be shuffled.
+
+    random_state : int or RandomState instance, default=None
+        When `shuffle` is True, `random_state` affects the ordering of the
+        indices, which controls the randomness of each fold for each class.
+        Otherwise, leave `random_state` as `None`.
+        Pass an int for reproducible output across multiple function calls.
+        See :term:`Glossary <random_state>`.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from sklearn.model_selection import StratifiedGroupKFold
+    >>> X = np.ones((17, 2))
+    >>> y = np.array([0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    >>> groups = np.array([1, 1, 2, 2, 3, 3, 3, 4, 5, 5, 5, 5, 6, 6, 7, 8, 8])
+    >>> cv = StratifiedGroupKFold(n_splits=3)
+    >>> for train_idxs, test_idxs in cv.split(X, y, groups):
+    ...     print("TRAIN:", groups[train_idxs])
+    ...     print("      ", y[train_idxs])
+    ...     print(" TEST:", groups[test_idxs])
+    ...     print("      ", y[test_idxs])
+    TRAIN: [2 2 4 5 5 5 5 6 6 7]
+           [1 1 1 0 0 0 0 0 0 0]
+     TEST: [1 1 3 3 3 8 8]
+           [0 0 1 1 1 0 0]
+    TRAIN: [1 1 3 3 3 4 5 5 5 5 8 8]
+           [0 0 1 1 1 1 0 0 0 0 0 0]
+     TEST: [2 2 6 6 7]
+           [1 1 0 0 0]
+    TRAIN: [1 1 2 2 3 3 3 6 6 7 8 8]
+           [0 0 1 1 1 1 1 0 0 0 0 0]
+     TEST: [4 5 5 5 5]
+           [1 0 0 0 0]
+
+    See also
+    --------
+    StratifiedKFold: Takes class information into account to build folds which
+        retain class distributions (for binary or multiclass classification
+        tasks).
+
+    GroupKFold: K-fold iterator variant with non-overlapping groups.
+    """
+
+    def __init__(self, n_splits=5, shuffle=False, random_state=None):
+        super().__init__(n_splits=n_splits, shuffle=shuffle,
+                         random_state=random_state)
+
+    # Implementation based on this kaggle kernel:
+    # https://www.kaggle.com/jakubwasikowski/stratified-group-k-fold-cross-validation
+    def _iter_test_indices(self, X, y, groups):
+        labels_num = np.max(y) + 1
+        y_counts_per_group = defaultdict(lambda: np.zeros(labels_num))
+        y_distr = Counter()
+        for label, group in zip(y, groups):
+            y_counts_per_group[group][label] += 1
+            y_distr[label] += 1
+
+        y_counts_per_fold = defaultdict(lambda: np.zeros(labels_num))
+        groups_per_fold = defaultdict(set)
+
+        groups_and_y_counts = list(y_counts_per_group.items())
+        rng = check_random_state(self.random_state)
+        if self.shuffle:
+            rng.shuffle(groups_and_y_counts)
+
+        for group, y_counts in sorted(groups_and_y_counts,
+                                      key=lambda x: -np.std(x[1])):
+            best_fold = None
+            min_eval = None
+            for i in range(self.n_splits):
+                y_counts_per_fold[i] += y_counts
+                std_per_label = []
+                for label in range(labels_num):
+                    std_per_label.append(np.std(
+                        [y_counts_per_fold[j][label] / y_distr[label]
+                         for j in range(self.n_splits)]))
+                y_counts_per_fold[i] -= y_counts
+                fold_eval = np.mean(std_per_label)
+                if min_eval is None or fold_eval < min_eval:
+                    min_eval = fold_eval
+                    best_fold = i
+            y_counts_per_fold[best_fold] += y_counts
+            groups_per_fold[best_fold].add(group)
+
+        for i in range(self.n_splits):
+            test_indices = [idx for idx, group in enumerate(groups)
+                            if group in groups_per_fold[i]]
+            yield test_indices
+
+
+class RepeatedStratifiedGroupKFold(_RepeatedSplits):
+    """Repeated Stratified K-Fold cross validator.
+
+    Repeats Stratified K-Fold with non-overlapping groups n times with
+    different randomization in each repetition.
+
+    Read more in the :ref:`User Guide <cross_validation>`.
+
+    Parameters
+    ----------
+    n_splits : int, default=5
+        Number of folds. Must be at least 2.
+
+    n_repeats : int, default=10
+        Number of times cross-validator needs to be repeated.
+
+    random_state : int or RandomState instance, default=None
+        Controls the generation of the random states for each repetition.
+        Pass an int for reproducible output across multiple function calls.
+        See :term:`Glossary <random_state>`.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from sklearn.model_selection import RepeatedStratifiedGroupKFold
+    >>> X = np.ones((17, 2))
+    >>> y = np.array([0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    >>> groups = np.array([1, 1, 2, 2, 3, 3, 3, 4, 5, 5, 5, 5, 6, 6, 7, 8, 8])
+    >>> cv = RepeatedStratifiedGroupKFold(n_splits=2, n_repeats=2,
+    ...                                   random_state=36851234)
+    >>> for train_index, test_index in cv.split(X, y, groups):
+    ...     print("TRAIN:", groups[train_idxs])
+    ...     print("      ", y[train_idxs])
+    ...     print(" TEST:", groups[test_idxs])
+    ...     print("      ", y[test_idxs])
+    TRAIN: [2 2 4 5 5 5 5 8 8]
+           [1 1 1 0 0 0 0 0 0]
+     TEST: [1 1 3 3 3 6 6 7]
+           [0 0 1 1 1 0 0 0]
+    TRAIN: [1 1 3 3 3 6 6 7]
+           [0 0 1 1 1 0 0 0]
+     TEST: [2 2 4 5 5 5 5 8 8]
+           [1 1 1 0 0 0 0 0 0]
+    TRAIN: [3 3 3 4 7 8 8]
+           [1 1 1 1 0 0 0]
+     TEST: [1 1 2 2 5 5 5 5 6 6]
+           [0 0 1 1 0 0 0 0 0 0]
+    TRAIN: [1 1 2 2 5 5 5 5 6 6]
+           [0 0 1 1 0 0 0 0 0 0]
+     TEST: [3 3 3 4 7 8 8]
+           [1 1 1 1 0 0 0]
+
+    Notes
+    -----
+    Randomized CV splitters may return different results for each call of
+    split. You can make the results identical by setting `random_state`
+    to an integer.
+
+    See also
+    --------
+    RepeatedStratifiedKFold: Repeats Stratified K-Fold n times.
+    """
+
+    def __init__(self, n_splits=5, n_repeats=10, random_state=None):
+        super().__init__(StratifiedGroupKFold, n_splits=n_splits,
+                         n_repeats=n_repeats, random_state=random_state)
