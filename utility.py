@@ -644,7 +644,7 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         # Predict on test data with best params
         y_pred = gs.predict(X_test)
         # Test data score of model with best params
-        print('Test set score for best params: %.3f ' % recall_score(y_test, y_pred, average="macro"))
+        print('Test set recall for best params: %.3f ' % recall_score(y_test, y_pred, average="macro"))
         # Save Pipeline name and best parameters to excel
         grid_results = pd.DataFrame(gs.cv_results_)
         grid_results["best_index"] = pd.Series(np.zeros(grid_results.shape[0]))
@@ -696,7 +696,7 @@ def model_assessment_vis(path, labels):
         barmode='group',
         title="MODEL COMPARISON",
         xaxis_title="Model",
-        yaxis_title="Recall average"
+        yaxis_title="Score average"
     )
 
     return pyo.plot(fig)
