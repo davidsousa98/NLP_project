@@ -361,6 +361,14 @@ def sample_excerpts(dataframe, stoppers, size):
         words = word_tokenize(row["text"])
         groups = []
         group = []
+        if (size == 'short') & (len(words) < 500):
+            groups.append((row["book_id"], row["author"], " ".join(words)))
+            data += groups
+            continue
+        elif (size == 'large') & (len(words) < 1000):
+            groups.append((row["book_id"], row["author"], " ".join(words)))
+            data += groups
+            continue
         for word in words:
             group.append(word)
             if size == 'short':
@@ -379,6 +387,34 @@ def sample_excerpts(dataframe, stoppers, size):
                     group = []
         data += groups
     return pd.DataFrame(data, columns=["book_id", "author", "text"])
+
+
+# def sample_excerpts(dataframe, stoppers):
+#     """
+#     Function that receives a DataFrame and creates subsets of ~500 words of each
+#     string in its "text" column.
+#
+#     :param dataframe: DataFrame to create subsets.
+#     :param stoppers: list of punctuation that defines the end of an excerpt.
+#
+#     Returns:
+#         - DataFrame object with a new text column that contains the subsets.
+#     """
+#     data = []
+#     for _, row in dataframe.iterrows():
+#         words = word_tokenize(row["text"])
+#         groups = []
+#         group = []
+#         for word in words:
+#             group.append(word)
+#             if (len(group) >= 485) & (group[-1] in stoppers):
+#                 groups.append((row["book_id"], row["author"], " ".join(group)))
+#                 group = []
+#             elif len(group) >= 600:  # Dealing with lack of punctuation
+#                 groups.append((row["book_id"], row["author"], " ".join(group)))
+#                 group = []
+#         data += groups
+#     return pd.DataFrame(data, columns=["book_id", "author", "text"])
 
 
 def visualize_groups(classes, groups):

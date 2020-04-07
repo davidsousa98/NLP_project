@@ -79,9 +79,8 @@ non_alphanum = non_alphanum.loc[~non_alphanum.isna()]
 
 # Sampling Excerpts
 # ----------------------------------------------------------------------------------------------------------------------
-train_excerpt_df = sample_excerpts(dataframe=train_df,
-                                   stoppers=[".", "...", "!", "?"],
-                                   size= 'large') #short = 500 or large = 1000
+train_excerpt_df = sample_excerpts(dataframe=train_df, stoppers=[".", "...", "!", "?"],
+                                   size='large')  # short = 500 or large = 1000
 # creating number of words column
 train_excerpt_df["word_count"] = train_excerpt_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
 train_excerpt_df["word_count"].describe()  # word count mean is around 500
@@ -121,10 +120,10 @@ train_excerpt_df["word_count"].describe()  # word count mean is around 500
 # X_res, y_res = ros.fit_resample(X_temp, y_temp)
 #
 # max_index = train_excerpt_df.index.max() + 1
-# X_train = X_train.append(pd.Series(X_res.flatten(), index=pd.RangeIndex(start=max_index,
-#                                                                         stop=max_index + sum(author_weights.values()))))
-# y_train = y_train.append(pd.Series(y_res.flatten(), index=pd.RangeIndex(start=max_index,
-#                                                                         stop=max_index + sum(author_weights.values()))))
+# X_train = X_train.append(
+#     pd.Series(X_res.flatten(), index=pd.RangeIndex(start=max_index, stop=max_index + sum(author_weights.values()))))
+# y_train = y_train.append(
+#     pd.Series(y_res.flatten(), index=pd.RangeIndex(start=max_index, stop=max_index + sum(author_weights.values()))))
 #
 # Model Selection
 # ----------------------------------------------------------------------------------------------------------------------
@@ -150,7 +149,11 @@ train_excerpt_df["word_count"].describe()  # word count mean is around 500
 # Regular train test split
 X = np.array(train_excerpt_df["text"])
 y = np.array(train_excerpt_df["author"])
-
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                    test_size=0.3,
+                                                    random_state=15,
+                                                    shuffle=True,
+                                                    stratify=y)
 
 # #Word Embedding
 # from nltk import word_tokenize
@@ -228,14 +231,6 @@ y = np.array(train_excerpt_df["author"])
 # training_pairs = build_training(tokenized_corpus, word2idx)
 #
 # W1, losses = Skip_Gram(training_pairs, word2idx)
-
-
-X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                    test_size=0.3,
-                                                    random_state=15,
-                                                    shuffle=True,
-                                                    stratify=y)
-
 
 # Construct some pipelines
 pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),

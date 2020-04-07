@@ -18,14 +18,22 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, StackingClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, confusion_matrix, recall_score, accuracy_score, make_scorer
+from sklearn.metrics import classification_report, confusion_matrix, recall_score, f1_score, make_scorer
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.classifier import StackingCVClassifier
 # nltk.download('rslp')
 # nltk.download('punkt')
 
-# TODO: Use word2vec to represent words
+# Changes from previous Pipeline
+# ----------------------------------------------------------------------------------------------------------------------
+# 1. train the model with 500 word and test both with 500 and 1000 words
+# 2. split the corpora into train and test set (70/30) and deny the possibility of finding excerpts of the same book
+# both in train and test set
+# 3. using F1 score in Grid Search for tuning hyper-parameters
 
+# Limitations
+# ----------------------------------------------------------------------------------------------------------------------
+# Weren't able to implement the TextCleaner in the Pipeline
 
 # Building Corpus
 # ----------------------------------------------------------------------------------------------------------------------
@@ -43,23 +51,8 @@ train_df = train_df[["file", "book_id", "author", "text"]]
 # Creating submission_df
 submission_df = df.loc[df["type"] == "test", ["file", "text"]].reset_index(drop=True)
 
-# Word count
-train_df["word_count"] = train_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
-
-# Train_test split
-X, y = train_df["text"], train_df["author"]
-X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                    test_size=0.3,
-                                                    random_state=5,
-                                                    shuffle=True,
-                                                    stratify=y)
-
-# Proportion of words in X_train: 0.707
-train_df.loc[train_df.index.isin(X_train.index), "word_count"].sum()/train_df["word_count"].sum()
-#
 # Preprocessing - Reference: http://www.nltk.org/howto/portuguese_en.html
 # ----------------------------------------------------------------------------------------------------------------------
-
 cleaner = TextCleaner(
     punctuation=['$', '%', '&', ')', '*', '+', '-', '/', '<', '=', '>', '@', '[', '\\', ']', '^', '_', '`', '{', '|',
                  '}', '~'] + [',', '.', '``', '?', '#', '!', "'", '"'],
@@ -71,27 +64,16 @@ cleaner = TextCleaner(
 updates = cleaner.transform(train_df["text"])
 update_df(train_df, updates)
 
-#
-# # cleaner reduces the number of words proportionally
-# train_df["word_count_clean"] = train_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
-# from matplotlib import pyplot as plt
-# fig, ax = plt.subplots()
-# ax.scatter(train_df["word_count"], train_df["word_count_clean"])
-# diag_line, = ax.plot(ax.get_xlim(), ax.get_ylim(), ls="--", c=".3")
-# plt.axis('equal')
-# plt.show()
-#
-
 # Sampling Excerpts
 # ----------------------------------------------------------------------------------------------------------------------
-train_excerpt_df = sample_excerpts(dataframe=train_df, stoppers=[".", "...", "!", "?"])
-
+train_excerpt_df = sample_excerpts(dataframe=train_df, stoppers=[".", "...", "!", "?"],
+                                   size='large')  # short = 500 or large = 1000
 # creating number of words column
 train_excerpt_df["word_count"] = train_excerpt_df["text"].apply(lambda x: len(nltk.word_tokenize(x)))
 train_excerpt_df["word_count"].describe()  # word count mean is around 500
 
 # visualize excerpt partition according to Books and Authors
-visualize_groups(train_excerpt_df["author"], train_excerpt_df["book_id"])  # by visualizing the plot we can understand
+# visualize_groups(train_excerpt_df["author"], train_excerpt_df["book_id"])  # by visualizing the plot we can understand
 # that we can't just do a stratified train_test_split as it will end up with excerpts from the same book in both the
 # training and test set leading to the problem of data leakage.
 
@@ -102,19 +84,37 @@ visualize_groups(train_excerpt_df["author"], train_excerpt_df["book_id"])  # by 
 # Grouping by book_id - like each observation were a book instead of an excerpt
 groupby = train_excerpt_df[["book_id", "author"]].groupby(by="book_id").first()
 X_groupby, y_groupby = groupby.index, groupby["author"].values
+# Splitting books in stratified way
 X_groupby_train, X_groupby_test, _, _ = train_test_split(X_groupby, y_groupby,
                                                          test_size=0.3,
                                                          random_state=0,
-                                                         shuffle=True,
                                                          stratify=y_groupby)
 
 # Obtaining the shuffled excerpt partitions and the group labels for the train data for future cross validation
-train_df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_train), ["text", "author", "book_id"]].\
+train_1000df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_train), ["text", "author", "book_id"]].\
     sample(frac=1, random_state=15)
-test_df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_test), ["text", "author", "book_id"]].\
+test_1000df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_test), ["text", "author", "book_id"]].\
     sample(frac=1, random_state=15)
-X_train, y_train, g_train = train_df["text"], train_df["author"], train_df["book_id"]
-X_test, y_test = test_df["text"], test_df["author"]
+X_1000test, y_1000test = test_1000df["text"], test_1000df["author"]
+
+# Verifying 70/30 split
+# test_1000df.shape[0]/train_excerpt_df.shape[0]
+# = 0.284 -> Proportion of 1000 words excerpts belonging to test set
+
+# Splitting excerpts in training set into 500 words and creating 500 words test set
+train_500df = sample_excerpts(dataframe=train_1000df, stoppers=[".", "...", "!", "?"], size='short').\
+    sample(frac=1, random_state=15)
+# train_500df["text"].apply(lambda x: len(nltk.word_tokenize(x))).describe()  # mean=496, std=18
+X_500train, y_500train = train_500df["text"], train_500df["author"]
+
+test_500df = sample_excerpts(dataframe=test_1000df, stoppers=[".", "...", "!", "?"], size='short').\
+    sample(frac=1, random_state=15)
+# test_500df["text"].apply(lambda x: len(nltk.word_tokenize(x))).describe()  # mean=499, std=22
+X_500test, y_500test = test_500df["text"], test_500df["author"]
+
+# Verifying 70/30 split
+# train_500df.shape[0]/(train_500df.shape[0] + test_500df.shape[0])
+# = 0.72 -> Proportion of 500 words excerpts belonging to training set
 
 # Construct some pipelines
 pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
@@ -276,7 +276,7 @@ grid_params_tfidf_pac = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
 # Construct grid searches
 jobs = -1
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=52)
-scoring = make_scorer(recall_score, average="macro")
+scoring = make_scorer(f1_score, average="macro")
 
 gs_cv_cnb = GridSearchCV(estimator=pipe_cv_cnb,
                          param_grid=grid_params_cv_cnb,
@@ -376,16 +376,14 @@ gs_tfidf_pac = GridSearchCV(estimator=pipe_tfidf_pac,
 
 # List of pipelines for ease of iteration
 grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc,
-         gs_cv_mlpc, gs_tfidf_mlpc]
-# , gs_cv_knc, gs_tfidf_knc, gs_cv_sgd, gs_tfidf_sgd, gs_cv_pac, gs_tfidf_pac]
+         gs_cv_mlpc, gs_tfidf_mlpc, gs_cv_knc, gs_tfidf_knc, gs_cv_sgd, gs_tfidf_sgd, gs_cv_pac, gs_tfidf_pac]
 
 # Dictionary of pipelines and classifier types for ease of reference
 grid_labels = ["cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_log", "tfidf_log", "cv_rfc", "tfidf_rfc",
-               "cv_mlpc", "tfidf_mlpc"]
-# , "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
+               "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
 
 # Model Selection - Running Grid Searches
-model_selection(grids, X_train, y_train, X_test, y_test, grid_labels)
+model_selection(grids, X_500train, y_500train, X_500test, y_500test, grid_labels)
 
 
 # Load pickle files with fitted models
@@ -409,45 +407,44 @@ gs_cv_pac = load("./outputs/Pipeline_cv_pac.pkl")
 gs_tfidf_pac = load("./outputs/Pipeline_tfidf_pac.pkl")
 
 # Ensemble
-
 # AdaBoost
 clf = AdaBoostClassifier(base_estimator=[gs_cv_knc, gs_tfidf_knn], n_estimators=100, algorithm='SAMME', random_state=15)
-clf.fit(X_train, y_train)
-y_pred = clf.predict(X_test)
+clf.fit(X_500train, y_500train)
+y_pred = clf.predict(X_500test)
 
 # Stacking classifier
 clf = StackingClassifier(estimators=[gs_cv_knc, gs_tfidf_knn],
                          final_estimator=LogisticRegression(class_weight='balanced', multi_class='multinomial'))
-clf.fit(X_train, y_train)
-y_pred = clf.predict(X_test)
+clf.fit(X_500train, y_500train)
+y_pred = clf.predict(X_500test)
 
 #  ('knn', gs_tfidf_knn), ('knc', gs_cv_knc)
 
 sclf = StackingCVClassifier(classifiers=[gs_cv_knc, gs_tfidf_knn],
                             meta_classifier=LogisticRegression(class_weight='balanced', multi_class='multinomial'),
                             random_state=15)
-sclf.fit(X_train, y_train)
-y_pred = sclf.predict(y_test)
+sclf.fit(X_500train, y_500train)
+y_pred = sclf.predict(y_500test)
 
-models_list = [gs_cv_cnb,gs_tfidf_cnb,gs_cv_knn, gs_tfidf_knn,gs_cv_log,gs_tfidf_log,gs_cv_rfc,gs_tfidf_rfc,gs_cv_knc,gs_tfid_knc]
-models_labels = ['cv_cnb', 'tfidf_cnb','cv_knn','tfidf_knn','cv_log','tfidf_log','cv_rfc','tfidf_rfc','cv_knc','tfidf_knc']
+models_list = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc,
+               gs_cv_knc, gs_tfid_knc]
+models_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc',
+                 'cv_knc', 'tfidf_knc']
 
 models_comb = list(itertools.combinations(models_list, 4))
 labels_comb = list(itertools.combinations(models_labels, 4))
-
 
 score = []
 for i in models_comb:
     ensemble = EnsembleVoteClassifier(clfs=list(i),
                                       voting='hard', refit=False)
-    ensemble.fit(X_train, y_train)
-    y_pred = ensemble.predict(X_test)
-    score.append(recall_score(y_test, y_pred, average='macro'))
+    ensemble.fit(X_500train, y_500train)
+    y_pred = ensemble.predict(X_500test)
+    score.append(recall_score(y_500test, y_pred, average='macro'))
 
-    results = (dict(sorted(zip(score,labels_comb), reverse = True)[:3]))
+    results = (dict(sorted(zip(score, labels_comb), reverse=True)[:3]))
 
-print('The top 3 models are: ', results, sep = '\n')
-
+print('The top 3 models are: ', results, sep='\n')
 
 # sorted(zip(score, models_labels), reverse=True)[:2])
 #
@@ -457,7 +454,6 @@ print('The top 3 models are: ', results, sep = '\n')
 # ensemble.fit(X_train, y_train)
 # y_pred = ensemble.predict(X_test)
 # print('The recall of the (tfidf_cnb, cv_knn) is: ', recall_score(y_test, y_pred, average='macro'))
-
 
 # Model Assessment
 # ----------------------------------------------------------------------------------------------------------------------
@@ -478,11 +474,14 @@ xlsx_path = './outputs/Pipelines.xlsx'
 # Comparing Test Error Score between Pipelines
 model_assessment_vis(xlsx_path, labels)
 
-y_pred = gs_tfidf_knn.predict(X_test)
-print(classification_report(y_test, y_pred, target_names=list(np.unique(y_test))))
+y_500pred = gs_tfidf_knn.predict(X_500test)
+y_1000pred = gs_tfidf_knn.predict(X_1000test)
+print(classification_report(y_500test, y_pred, target_names=list(np.unique(y_500test))))
+print(classification_report(y_1000test, y_pred, target_names=list(np.unique(y_1000test))))
 
 # plot confusion matrix
-plot_cm(confusion_matrix(y_test, y_pred), np.unique(y_test))
+plot_cm(confusion_matrix(y_500test, y_pred), np.unique(y_500test))
+plot_cm(confusion_matrix(y_1000test, y_pred), np.unique(y_1000test))
 
 # evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
 #                                                         output_dict=True))
