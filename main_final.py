@@ -18,7 +18,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, StackingClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, confusion_matrix, recall_score, f1_score, make_scorer
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, make_scorer
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.classifier import StackingCVClassifier
 # nltk.download('rslp')
@@ -385,7 +385,7 @@ grid_labels = ["cv_sgd","tfidf_sgd"]
     #            "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
 
 # Model Selection - Running Grid Searches
-model_selection(grids, X_500train, y_500train, X_500test, y_500test, grid_labels)
+model_selection(grids, X_500train, y_500train, [X_500test, X_1000test], [y_500test, y_1000test], grid_labels)
 
 
 # Load pickle files with fitted models
@@ -447,7 +447,7 @@ for i in models_comb:
                                       voting='hard', refit=False)
     ensemble.fit(X_500train, y_500train)
     y_pred = ensemble.predict(X_500test)
-    score.append(recall_score(y_500test, y_pred, average='macro'))
+    score.append(f1_score(y_500test, y_pred, average='macro'))
 
     results = (dict(sorted(zip(score, labels_comb), reverse=True)[:3]))
 
@@ -485,8 +485,8 @@ xlsx_path = './outputs/Pipelines.xlsx'
 # Comparing Test Error Score between Pipelines
 model_assessment_vis(xlsx_path, labels)
 
-y_500pred = gs_tfidf_knc.predict(X_500test)
-y_1000pred = gs_cv_knc.predict(X_1000test)
+y_500pred = gs_tfidf_knn.predict(X_500test)
+y_1000pred = gs_tfidf_knn.predict(X_1000test)
 print(classification_report(y_500test, y_500pred, target_names=list(np.unique(y_500test))))
 print(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(y_1000test))))
 
@@ -586,3 +586,5 @@ submission.to_csv("./outputs/submission.csv", index=False)
 # References
 # ----------------------------------------------------------------------------------------------------------------------
 # https://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
+# https://scikit-learn.org/stable/modules/cross_validation.html
+# https://scikit-learn.org/stable/modules/grid_search.html
