@@ -226,14 +226,14 @@ grid_params_cv_sgd = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__stop_words": [[".", "...", "!", "?"], None],
                        "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
                        "sgd__penalty": ['l2', 'elasticnet'],
-                       "sgd__loss:": ["modified_huber", "squared_hinge", "perceptron"]}]
+                       "sgd__loss": ["modified_huber", "squared_hinge", "perceptron"]}]
 
 grid_params_tfidf_sgd = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
                           "tfidf__stop_words": [[".", "...", "!", "?"], None],
                           "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
                           "sgd__penalty": ['l2', 'elasticnet'],
-                          "sgd__loss:": ["modified_huber", "squared_hinge", "perceptron"]}]
+                          "sgd__loss": ["modified_huber", "squared_hinge", "perceptron"]}]
 
 grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
                        "cv__binary": [True, False],
@@ -385,7 +385,7 @@ grid_labels = ["cv_log", "cv_sgd", "tfidf_sgd"]
     #       "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
 
 # Model Selection - Running Grid Searches
-model_selection(grids, X_500train, y_500train, X_500test, y_500test, grid_labels)
+model_selection(grids, X_500train, y_500train, [X_500test, X_1000test], [y_500test, y_1000test], grid_labels)
 
 
 # Load pickle files with fitted models
@@ -478,12 +478,12 @@ model_assessment_vis(xlsx_path, labels)
 
 y_500pred = gs_tfidf_knn.predict(X_500test)
 y_1000pred = gs_tfidf_knn.predict(X_1000test)
-print(classification_report(y_500test, y_pred, target_names=list(np.unique(y_500test))))
-print(classification_report(y_1000test, y_pred, target_names=list(np.unique(y_1000test))))
+print(classification_report(y_500test, y_500pred, target_names=list(np.unique(y_500test))))
+print(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(y_1000test))))
 
 # plot confusion matrix
-plot_cm(confusion_matrix(y_500test, y_pred), np.unique(y_500test))
-plot_cm(confusion_matrix(y_1000test, y_pred), np.unique(y_1000test))
+plot_cm(confusion_matrix(y_500test, y_500pred), np.unique(y_500test))
+plot_cm(confusion_matrix(y_1000test, y_1000pred), np.unique(y_1000test))
 
 # evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
 #                                                         output_dict=True))
@@ -577,3 +577,5 @@ submission.to_csv("./outputs/submission.csv", index=False)
 # References
 # ----------------------------------------------------------------------------------------------------------------------
 # https://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
+# https://scikit-learn.org/stable/modules/cross_validation.html
+# https://scikit-learn.org/stable/modules/grid_search.html

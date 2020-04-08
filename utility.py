@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk import word_tokenize
 from nltk.stem import SnowballStemmer, RSLPStemmer
-from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score, f1_score
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.base import BaseEstimator, TransformerMixin
 from joblib import dump
@@ -640,15 +640,20 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
         # Best params
         print('Best params: %s' % gs.best_params_)
         # Best training data score
-        print('Best training score: %.3f' % gs.best_score_)
-        # Predict on test data with best params
-        y_pred = gs.predict(X_test)
+        print('Best cross-validation score: %.3f' % gs.best_score_)
         # Test data score of model with best params
-        print('Test set recall for best params: %.3f ' % recall_score(y_test, y_pred, average="macro"))
+        scores = []
+        for i, j in zip(X_test, y_test):
+            score = gs.score(i, j)
+            scores.append(score)
+            print('Test set best parameters score for {scorer} is: {score:.3f} '.format(scorer=gs.scorer_, score=score))
         # Save Pipeline name and best parameters to excel
         grid_results = pd.DataFrame(gs.cv_results_)
         grid_results["best_index"] = pd.Series(np.zeros(grid_results.shape[0]))
         grid_results.loc[gs.best_index_, "best_index"] = 1
+        for i in range(len(X_test)):
+            grid_results["indep_test_score{}".format(i)] = pd.Series(np.zeros(grid_results.shape[0]))
+            grid_results.loc[gs.best_index_, "indep_test_score{}".format(i)] = scores[i]
         save_excel(grid_results, label, "Pipelines")
         # Save fitted grid to pickle file
         dump(gs, "./outputs/Pipeline_{}.pkl".format(label), compress=1)
