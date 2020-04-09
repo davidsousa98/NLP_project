@@ -9,6 +9,7 @@ import nltk
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from imblearn.over_sampling import RandomOverSampler
 from sklearn.naive_bayes import ComplementNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import PassiveAggressiveClassifier
@@ -411,7 +412,7 @@ gs_tfidf_cnb = load("./outputs/Pipeline_tfidf_cnb.pkl")
 gs_cv_knn = load("./outputs/Pipeline_cv_knn.pkl")
 gs_tfidf_knn = load("./outputs/Pipeline_tfidf_knn.pkl")
 gs_cv_knc = load("./outputs/Pipeline_cv_knc.pkl")
-gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
+gs_tfidf_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 gs_cv_log = load("./outputs/Pipeline_cv_log.pkl")
 gs_tfidf_log = load("./outputs/Pipeline_tfidf_log.pkl")
 # gs_cv_rfc = load("./outputs/Pipeline_cv_rfc.pkl")
@@ -425,52 +426,85 @@ gs_tfidf_pac = load("./outputs/Pipeline_tfidf_pac.pkl")
 
 # Ensemble
 # AdaBoost
-clf = AdaBoostClassifier(base_estimator=[gs_cv_knc, gs_tfidf_knn], n_estimators=100, algorithm='SAMME', random_state=15)
-clf.fit(X_500train, y_500train)
-y_pred = clf.predict(X_500test)
-
-# Stacking classifier
-clf = StackingClassifier(estimators=[gs_cv_knc, gs_tfidf_knn],
-                         final_estimator=LogisticRegression(class_weight='balanced', multi_class='multinomial'))
-clf.fit(X_500train, y_500train)
-y_pred = clf.predict(X_500test)
-
-#  ('knn', gs_tfidf_knn), ('knc', gs_cv_knc)
-
-sclf = StackingCVClassifier(classifiers=[gs_cv_knc, gs_tfidf_knn],
-                            meta_classifier=LogisticRegression(class_weight='balanced', multi_class='multinomial'),
-                            random_state=15)
-sclf.fit(X_500train, y_500train)
-y_pred = sclf.predict(y_500test)
-
-models_list = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc,
-               gs_cv_knc, gs_tfid_knc]
-models_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_log', 'tfidf_log', 'cv_rfc', 'tfidf_rfc',
-                 'cv_knc', 'tfidf_knc']
-
-models_comb = list(itertools.combinations(models_list, 4))
-labels_comb = list(itertools.combinations(models_labels, 4))
-
-score = []
-for i in models_comb:
-    ensemble = EnsembleVoteClassifier(clfs=list(i),
-                                      voting='hard', refit=False)
-    ensemble.fit(X_500train, y_500train)
-    y_pred = ensemble.predict(X_500test)
-    score.append(f1_score(y_500test, y_pred, average='macro'))
-
-    results = (dict(sorted(zip(score, labels_comb), reverse=True)[:3]))
-
-print('The top 3 models are: ', results, sep='\n')
-
-# sorted(zip(score, models_labels), reverse=True)[:2])
+# clf = AdaBoostClassifier(base_estimator=[gs_cv_knc, gs_tfidf_knn], n_estimators=100, algorithm='SAMME', random_state=15)
+# clf.fit(X_500train, y_500train)
+# y_pred = clf.predict(X_500test)
 #
-# ensemble = EnsembleVoteClassifier(clfs=[gs_tfidf_knn,gs_cv_log,gs_cv_knc],
-#                                   voting='hard', refit=False)
+# # Stacking classifier
+# clf = StackingClassifier(estimators=[gs_cv_knc, gs_tfidf_knn],
+#                          final_estimator=LogisticRegression(class_weight='balanced', multi_class='multinomial'))
+# clf.fit(X_500train, y_500train)
+# y_pred = clf.predict(X_500test)
 #
-# ensemble.fit(X_train, y_train)
-# y_pred = ensemble.predict(X_test)
-# print('The f1_score of the (tfidf_cnb, cv_knn) is: ', f1_score(y_test, y_pred, average='macro'))
+# #  ('knn', gs_tfidf_knn), ('knc', gs_cv_knc)
+#
+# sclf = StackingCVClassifier(classifiers=[gs_cv_knc, gs_tfidf_knn],
+#                             meta_classifier=LogisticRegression(class_weight='balanced', multi_class='multinomial'),
+#                             random_state=15)
+# sclf.fit(X_500train, y_500train)
+# y_pred = sclf.predict(y_500test)
+
+#Vote Classifier
+    #Test ensemble combinations:
+def ensemble_vote(n_combinations, excerpt_size):
+    """
+    Parameters:
+
+    n_combinations : int
+        Number of models to be combined in the ensemble.
+
+    excerpt_size : ['short','large']
+
+        Size of the excerpt to be tested:
+        short = 500 words excerpt
+        large = 1000 words excerpt.
+        """
+
+
+    if excerpt_size == 'large':
+        X_train = X_500train
+        X_test = X_1000test
+        y_train = y_500train
+        y_test = y_1000test
+
+    elif excerpt_size == 'short':
+        X_train = X_500train
+        X_test = X_500test
+        y_train = y_500train
+        y_test = y_500test
+
+    models_list = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_knc, gs_tfidf_knc,
+                   gs_cv_log,gs_tfidf_log, gs_cv_pac, gs_tfidf_pac] # gs_cv_rfc, gs_tfidf_rfc
+
+    models_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn','cv_knc','tfidf_knc',
+                     'cv_log','tfidf_log','cv_pac', 'tfidf_pac'] #'cv_rfc', 'tfidf_rfc'
+
+    models_comb = list(itertools.combinations(models_list, n_combinations))
+    labels_comb = list(itertools.combinations(models_labels, n_combinations))
+
+    score = []
+    for i in models_comb:
+        ensemble = EnsembleVoteClassifier(clfs=list(i),
+                                          voting='hard', refit=False)
+        ensemble.fit(X_500train, y_train)
+        y_pred = ensemble.predict(X_test)
+        score.append(f1_score(y_test, y_pred, average='macro'))
+
+        results = (dict(sorted(zip(score, labels_comb), reverse=True)))
+
+    print('The top 3 ensembles for combinations of {} and excerpt size "{}" are: \n{}'
+          .format(n_combinations,excerpt_size,results))
+
+ensemble_vote(3,'large') #short or large
+
+
+#Fit ensemble:
+ensemble = EnsembleVoteClassifier(clfs=[gs_tfidf_knn,gs_cv_knc,gs_cv_log],
+                                  voting='hard', refit=False)
+ensemble.fit(X_500train, y_500train)
+# y_pred = ensemble.predict(X_1000test)
+# print('The recall of the (tfidf_knn, cv_knc, cv_pac) is: ', f1_score(y_1000test, y_pred, average='macro'))
+
 
 # Model Assessment
 # ----------------------------------------------------------------------------------------------------------------------
@@ -515,6 +549,11 @@ best_params = {'knn__n_neighbors': 5, 'knn__weights': 'distance', 'tfidf__binary
                'tfidf__max_df': 0.8, 'tfidf__ngram_range': (1, 3), 'tfidf__stop_words': ['.', '...', '!', '?']}
 best_gs = pipe_tfidf_knn.set_params(**best_params).fit(X_500train, y_500train)
 y_500pred, y_1000pred = best_gs.predict(X_500test), best_gs.predict(X_1000test)
+
+# Assessing emsemble
+y_500pred = ensemble.predict(X_500test)
+y_1000pred = ensemble.predict(X_1000test)
+
 # classification report
 print(classification_report(y_500test, y_500pred, target_names=list(np.unique(y_500test))))
 print(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(y_1000test))))
@@ -652,3 +691,15 @@ submission.to_csv("./outputs/submission.csv", index=False)
 # https://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
 # https://scikit-learn.org/stable/modules/cross_validation.html
 # https://scikit-learn.org/stable/modules/grid_search.html
+
+#
+# cv_f1500 = [0.643818771348588,0.810768480733043,0.946949887046312,0.930998002111493,0.930998080452325,0.926667]
+# cv_f11000= [0.575557752051885,0.852971331291678,0.823053566426323,0.960478263714171,0.943030399251382,0.961667]
+# sum(cv_f11000)/6
+#
+# tfidf_f1500 = [0.401747924904321,0.919370456993357,0.853246901281279,0.727165581182741,0.865584495601857,0.873333]
+#
+# tfidf_f11000 = [0.412220428836646,0.982182981239585,0.891593046662732,0.773217666840039,0.852135351692357,0.916667]
+#
+# sum(tfidf_f1500)/6
+# sum(tfidf_f11000)/6
