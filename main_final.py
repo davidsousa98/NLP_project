@@ -1,5 +1,5 @@
 from utility import get_files_zip, read_txt_zip, TextCleaner, update_df, sample_excerpts, visualize_groups, plot_cm, \
-    model_selection, model_assessment_vis
+    model_selection, model_assessment_vis, save_excel, model_assessment_author_vis
 from joblib import load
 import itertools
 import numpy as np
@@ -21,6 +21,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, make_scorer
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.classifier import StackingCVClassifier
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 # nltk.download('rslp')
 # nltk.download('punkt')
 
@@ -77,6 +79,7 @@ train_excerpt_df["word_count"].describe()  # word count mean is around 500
 # that we can't just do a stratified train_test_split as it will end up with excerpts from the same book in both the
 # training and test set leading to the problem of data leakage.
 
+
 # Model Selection
 # ----------------------------------------------------------------------------------------------------------------------
 # Reference: https://www.kdnuggets.com/2018/01/managing-machine-learning-workflows-scikit-learn-pipelines-part-3.html
@@ -116,6 +119,23 @@ X_500test, y_500test = test_500df["text"], test_500df["author"]
 # train_500df.shape[0]/(train_500df.shape[0] + test_500df.shape[0])
 # = 0.72 -> Proportion of 500 words excerpts belonging to training set
 
+# Over Sampling 500 words train set
+author_over_weights = {"LuisaMarquesSilva": int((y_500train == "LuisaMarquesSilva").sum()*1.5)}
+ros = RandomOverSampler(sampling_strategy=author_over_weights, random_state=15)
+X_temp, y_temp = X_500train.values.reshape(-1, 1), y_500train.values.reshape(-1, 1)
+X_500train, y_500train = ros.fit_resample(X_temp, y_temp)
+
+# Under Sampling 500 words train set
+author_under_weights = {"JoseRodriguesSantos": int((y_500train == "JoseRodriguesSantos").sum()*0.6)}
+rus = RandomUnderSampler(sampling_strategy=author_under_weights, random_state=15)
+# X_temp, y_temp = X_500train.reshape(-1, 1), y_500train.reshape(-1, 1)
+X_500train, y_500train = rus.fit_resample(X_500train, y_500train)
+
+# Shuffle training samples
+shuffle_temp = pd.DataFrame({"X": X_500train.flatten(), "y": y_500train}).sample(frac=1, random_state=15)
+X_500train, y_500train = shuffle_temp["X"].values, shuffle_temp["y"].values
+
+
 # Construct some pipelines
 pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
                         ('cnb', ComplementNB())])
@@ -147,13 +167,13 @@ pipe_cv_sgd = Pipeline([('cv', CountVectorizer()),
 pipe_tfidf_sgd = Pipeline([('tfidf', TfidfVectorizer()),
                            ('sgd', SGDClassifier(random_state=15))])
 
-pipe_cv_rfc = Pipeline([('cv', CountVectorizer()),
+pipe_cv_rfc = Pipeline([('cv', CountVectorizer(ngram_range=(1, 2), stop_words=[".", "...", "!", "?"], max_df=0.8)),
                         ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
 pipe_tfidf_rfc = Pipeline([('tfidf', TfidfVectorizer()),
                            ('rfc', RandomForestClassifier(class_weight='balanced', random_state=15))])
 
-pipe_cv_mlpc = Pipeline([('cv', CountVectorizer(ngram_range=(1, 2), stop_words=[".", "...", "!", "?"])),
+pipe_cv_mlpc = Pipeline([('cv', CountVectorizer(ngram_range=(1, 2), stop_words=[".", "...", "!", "?"], max_df=0.8)),
                          ('mlpc', MLPClassifier(hidden_layer_sizes=(50, 50), learning_rate="adaptive",
                                                 random_state=15))])
 
@@ -235,12 +255,10 @@ grid_params_tfidf_sgd = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "sgd__penalty": ['l2', 'elasticnet'],
                           "sgd__loss": ["modified_huber", "squared_hinge", "perceptron"]}]
 
-grid_params_cv_rfc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-                       "cv__binary": [True, False],
-                       "cv__stop_words": [[".", "...", "!", "?"], None],
-                       "cv__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                       "tfidf__ngram_range": [(1, 1), (1, 2), (1, 3)],
-                       "rfc__n_estimators": np.arange(100, 600, 100)}]
+grid_params_cv_rfc = [{"cv__binary": [True, False],
+                       "rfc__n_estimators": np.arange(100, 400, 100),
+                       "rfc__max_features": ['sqrt', 'log2'],
+                       "rfc__criterion": ["gini", "entropy"]}]
 
 grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "tfidf__binary": [True, False],
@@ -249,8 +267,7 @@ grid_params_tfidf_rfc = [{"tfidf__max_df": np.arange(0.8, 1.05, 0.05),
                           "rfc__n_estimators": np.arange(100, 600, 100)}]
 
 # ~12 minutes to run each
-grid_params_cv_mlpc = [{"cv__max_df": np.arange(0.8, 1.05, 0.05),
-                        "cv__binary": [True, False],
+grid_params_cv_mlpc = [{"cv__binary": [True, False],
                         "mlpc__activation": ['tanh', 'relu'],
                         'mlpc__alpha': [0.0001, 0.05]}]
 
@@ -375,14 +392,14 @@ gs_tfidf_pac = GridSearchCV(estimator=pipe_tfidf_pac,
                             n_jobs=jobs)
 
 # List of pipelines for ease of iteration
-grids = [gs_cv_log, gs_cv_sgd, gs_tfidf_sgd]
+grids = [gs_cv_mlpc, gs_cv_rfc]
     # gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log,  gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc,
     #      gs_cv_mlpc, gs_tfidf_mlpc, gs_cv_knc, gs_tfidf_knc, gs_cv_sgd, gs_tfidf_sgd, gs_cv_pac, gs_tfidf_pac]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ["cv_log", "cv_sgd", "tfidf_sgd"]
+grid_labels = ["cv_mlpc", "cv_rfc"]
     # "cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_log", "tfidf_log", "cv_rfc", "tfidf_rfc",
-    #       "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
+    #      "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
 
 # Model Selection - Running Grid Searches
 model_selection(grids, X_500train, y_500train, [X_500test, X_1000test], [y_500test, y_1000test], grid_labels)
@@ -397,14 +414,12 @@ gs_cv_knc = load("./outputs/Pipeline_cv_knc.pkl")
 gs_tfid_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 gs_cv_log = load("./outputs/Pipeline_cv_log.pkl")
 gs_tfidf_log = load("./outputs/Pipeline_tfidf_log.pkl")
-gs_cv_rfc = load("./outputs/Pipeline_cv_rfc.pkl")
-gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
+# gs_cv_rfc = load("./outputs/Pipeline_cv_rfc.pkl")
+# gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
 gs_cv_sgd = load("./outputs/Pipeline_cv_sgd.pkl")
 gs_tfidf_sgd = load("./outputs/Pipeline_tfidf_sgd.pkl")
-gs_cv_lsvc = load("./outputs/Pipeline_cv_lsvc.pkl")
-gs_tfidf_lsvc = load("./outputs/Pipeline_tfidf_lsvc.pkl")
-gs_cv_mlpc = load("./outputs/Pipeline_cv_mlpc.pkl")
-gs_tfidf_mlpc = load("./outputs/Pipeline_tfidf_mlpc.pkl")
+# gs_cv_mlpc = load("./outputs/Pipeline_cv_mlpc.pkl")
+# gs_tfidf_mlpc = load("./outputs/Pipeline_tfidf_mlpc.pkl")
 gs_cv_pac = load("./outputs/Pipeline_cv_pac.pkl")
 gs_tfidf_pac = load("./outputs/Pipeline_tfidf_pac.pkl")
 
@@ -462,32 +477,90 @@ print('The top 3 models are: ', results, sep='\n')
 # See reference:
 # https://scikit-learn.org/stable/auto_examples/model_selection/plot_multi_metric_evaluation.html#sphx-glr-auto-examples-model-selection-plot-multi-metric-evaluation-py
 labels = {"tfidf": "TF-IDF",
-          "cv": "CountVectorizer",
+          "cv": "Bag-of-Words",
           "cnb": "NaiveBayes",
           "knn": "KNearestNeighbors",
+          "knc": "KNearestCentroid",
           "log": "LogisticRegression",
           "rfc": "RandomForest",
-          "sgd": "StocasticGradientDescent",
+          "sgd": "StochasticGradientDescent",
           "lsvc": "LinearSupportVector",
           "mlpc": "MultiLayerPerceptron",
-          "pac": "PassiveAgressive"}
+          "pac": "PassiveAggressive"}
 xlsx_path = './outputs/Pipelines.xlsx'
 
 # Comparing Test Error Score between Pipelines
 model_assessment_vis(xlsx_path, labels)
 
-y_500pred = gs_tfidf_knn.predict(X_500test)
-y_1000pred = gs_tfidf_knn.predict(X_1000test)
+# Creating excel with classification report of each model
+# for i in grid_labels:
+#     gs = load("./outputs/Pipeline_{}.pkl".format(i))
+#     y_500pred, y_1000pred = gs.predict(X_500test), gs.predict(X_1000test)
+#     cr_500 = pd.DataFrame(classification_report(y_500test, y_500pred, target_names=list(np.unique(y_500test)),
+#                                                 output_dict=True))
+#     cr_500.index = map(lambda x: x + "_500", cr_500.index.to_list())
+#     cr_1000 = pd.DataFrame(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(y_1000test)),
+#                                                  output_dict=True))
+#     cr_1000.index = map(lambda x: x + "_1000", cr_1000.index.to_list())
+#     cr_total = pd.concat([cr_500, cr_1000])
+#     save_excel(cr_total, i, "classification_reports")
+#     del gs
+
+# Comparing Test Error Score between Pipelines by Author
+xlsx_path = './outputs/classification_reports.xlsx'
+model_assessment_author_vis(xlsx_path, labels)
+
+# Assessing best model
+best_params = {'knn__n_neighbors': 5, 'knn__weights': 'distance', 'tfidf__binary': True,
+               'tfidf__max_df': 0.8, 'tfidf__ngram_range': (1, 3), 'tfidf__stop_words': ['.', '...', '!', '?']}
+best_gs = pipe_tfidf_knn.set_params(**best_params).fit(X_500train, y_500train)
+y_500pred, y_1000pred = best_gs.predict(X_500test), best_gs.predict(X_1000test)
+# classification report
 print(classification_report(y_500test, y_500pred, target_names=list(np.unique(y_500test))))
 print(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(y_1000test))))
+
+# import plotly.graph_objects as go
+# import plotly.offline as pyo
+#
+# sampling_tests = pd.DataFrame({"Original": [0.92, 0.98],
+#                                "OS-lms1.25": [0.93, 0.97],
+#                                "OS-lms2": [0.9, 0.96],
+#                                "OS-lms3": [0.89, 0.91],
+#                                "OS-lms1.5 + US-jrs0.8": [0.93, 0.97],
+#                                "OS-lms1.5 + US-jrs0.6": [0.94, 0.97],
+#                                "OS-lms1.5 + US-jrs0.6_ccb0.8": [0.93, 0.97],
+#                                "OS-lms1.5 + US-jrs0.8_ccb0.8": [0.94, 0.97],
+#                                "OS-lms1.5 + US-jrs0.7_ccb0.7": [0.93, 0.96],
+#                                "OS-lms2 + US-jrs0.8_ccb0.8": [0.91, 0.97]},
+#                               index=["500_words", "1000_words"]).transpose()
+#
+# fig = go.Figure()
+# fig.add_trace(go.Bar(
+#     name="500 words",
+#     x=sampling_tests.index, y=sampling_tests["500_words"],
+#     text=sampling_tests["500_words"]
+# ))
+# fig.add_trace(go.Bar(
+#     name="1000 words",
+#     x=sampling_tests.index, y=sampling_tests["1000_words"],
+#     text=sampling_tests["1000_words"]
+# ))
+# fig.update_traces(
+#         texttemplate='%{text:.2f}',
+#         textposition='outside'
+# )
+# fig.update_layout(
+#     barmode='group',
+#     title="TF-IDF + KNearestNeighbors sampling trials comparison on test set error",
+#     xaxis_title="Sampling trials",
+#     yaxis_title="Test F1-Score"
+# )
+# pyo.plot(fig)
 
 # plot confusion matrix
 plot_cm(confusion_matrix(y_500test, y_500pred), np.unique(y_500test))
 plot_cm(confusion_matrix(y_1000test, y_1000pred), np.unique(y_1000test))
 
-# evaluation_metrics = pd.DataFrame(classification_report(y_test, y_pred, target_names=list(np.unique(y_test)),
-#                                                         output_dict=True))
-# save_excel(evaluation_metrics, 'NGRAM13_KNN5')  # save the results in a excel file
 
 # Prediction
 # ----------------------------------------------------------------------------------------------------------------------

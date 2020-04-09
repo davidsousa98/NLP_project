@@ -571,6 +571,7 @@ def save_excel(dataframe, sheetname, filename="metrics"):
     writer = pd.ExcelWriter('./outputs/{}.xlsx'.format(filename), engine='openpyxl', mode=mode)
     dataframe.to_excel(writer, sheet_name=sheetname)
     writer.save()
+    writer.close()
 
 
 def get_top_n_grams(corpus, top_k, n):
@@ -662,7 +663,7 @@ def model_selection(grids, X_train, y_train, X_test, y_test, grid_labels):
 
 def model_assessment_vis(path, labels):
     """
-    Produces a bar plot for mean test score comparison together with error.
+    Produces a bar plot for test F1-score comparison between models for both 500 and 1000 words text excerpts.
     :param path: path to excel file with each sheet representing a GridSearchCV results.
     :param labels: dictionary that contains grid labels (e.g. cv, knn) as keys and visualization labels as values
     (e.g. CountVectorizer, KNearestNeighbors).
@@ -675,33 +676,83 @@ def model_assessment_vis(path, labels):
     update_dfs = []
     for i, df in enumerate(dfs):
         params = xls.sheet_names[i].split("_")
-        df = df.loc[df.best_index == 1, ['mean_test_score', 'std_test_score']]
-        df['model'] = labels[params[1]]
-        df['encoding'] = labels[params[0]]
+        df = df.loc[df.best_index == 1, ['indep_test_score0', 'indep_test_score1']]
+        df['grid'] = labels[params[0]] + " + " + labels[params[1]]
         update_dfs.append(df)
 
     xls.close()
     vis = pd.concat(update_dfs, ignore_index=True)
-    vis_tfidf = vis.loc[vis.encoding == 'TF-IDF']
-    vis_cv = vis.loc[vis.encoding == 'CountVectorizer']
+    vis["sort"] = vis["grid"].str.extract(r'\+ (.*)')
+    vis.sort_values(by="sort", inplace=True)
+    vis_500 = vis[["grid", "indep_test_score0"]]
+    vis_1000 = vis[["grid", "indep_test_score1"]]
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        name='Bag of Words',
-        x=vis_cv['model'], y=vis_cv['mean_test_score'],
-        error_y=dict(type='data', array=vis_cv['std_test_score'])
+        name='500 words',
+        x=vis_500['grid'], y=vis_500['indep_test_score0'],
+        text=vis_500['indep_test_score0'],
     ))
     fig.add_trace(go.Bar(
-        name='TF-IDF',
-        x=vis_tfidf['model'], y=vis_tfidf['mean_test_score'],
-        error_y=dict(type='data', array=vis_tfidf['std_test_score'])
+        name='1000 words',
+        x=vis_1000['grid'], y=vis_1000['indep_test_score1'],
+        text=vis_1000['indep_test_score1'],
     ))
-
+    fig.update_traces(
+        texttemplate='%{text:.2f}',
+        textposition='outside'
+    )
     fig.update_layout(
         barmode='group',
-        title="MODEL COMPARISON",
-        xaxis_title="Model",
-        yaxis_title="Score average"
+        title="Model comparison on test set error",
+        xaxis_title="Final Models",
+        yaxis_title="Test F1-Score"
+    )
+
+    return pyo.plot(fig)
+
+
+def model_assessment_author_vis(path, labels):
+    """
+    Produces a bar plot for test F1-score (avg of 500 and 1000 word excerpts) comparison between models' author performance.
+    :param path: path to excel file with each sheet representing a GridSearchCV results.
+    :param labels: dictionary that contains grid labels (e.g. cv, knn) as keys and visualization labels as values
+    (e.g. CountVectorizer, KNearestNeighbors).
+
+    Returns: Plotly Visualization
+    """
+    xls = pd.ExcelFile(path, engine="openpyxl")
+    dfs = [pd.read_excel(xls, i, index_col=0) for i in xls.sheet_names]
+
+    update_dfs = []
+    for i, df in enumerate(dfs):
+        params = xls.sheet_names[i].split("_")
+        df = df.iloc[[2, 6], :6]
+        df['grid'] = labels[params[0]] + " + " + labels[params[1]]
+        update_dfs.append(df)
+
+    xls.close()
+    vis = pd.concat(update_dfs).groupby("grid").mean()
+    vis["sort"] = vis.index.str.extract(r'\+ (.*)').values
+    vis.sort_values(by="sort", inplace=True)
+    vis.drop("sort", axis=1, inplace=True)
+
+    fig = go.Figure()
+    for i in vis.columns:
+        fig.add_trace(go.Bar(
+            name=i,
+            x=vis.index, y=vis[i],
+            text=vis[i]
+        ))
+    # fig.update_traces(
+    #     texttemplate='%{text:.2f}',
+    #     textposition='outside'
+    # )
+    fig.update_layout(
+        barmode='group',
+        title="Models' author test set average error comparison",
+        xaxis_title="Final Models",
+        yaxis_title="Test F1-Score"
     )
 
     return pyo.plot(fig)
