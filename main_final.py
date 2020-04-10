@@ -1,6 +1,6 @@
 from utility import get_files_zip, read_txt_zip, TextCleaner, update_df, sample_excerpts, visualize_groups, plot_cm, \
     model_selection, model_assessment_vis, save_excel, model_assessment_author_vis
-from joblib import load
+from joblib import load, dump
 import itertools
 import numpy as np
 import pandas as pd
@@ -9,21 +9,22 @@ import nltk
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
-from imblearn.over_sampling import RandomOverSampler
 from sklearn.naive_bayes import ComplementNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import PassiveAggressiveClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestCentroid
 from sklearn.linear_model import SGDClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, StackingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, make_scorer
 from mlxtend.classifier import EnsembleVoteClassifier
-from mlxtend.classifier import StackingCVClassifier
+from torch.autograd import Variable
+import torch.nn.functional as F
+import torch
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
+
 # nltk.download('rslp')
 # nltk.download('punkt')
 
@@ -95,9 +96,9 @@ X_groupby_train, X_groupby_test, _, _ = train_test_split(X_groupby, y_groupby,
                                                          stratify=y_groupby)
 
 # Obtaining the shuffled excerpt partitions and the group labels for the train data for future cross validation
-train_1000df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_train), ["text", "author", "book_id"]].\
+train_1000df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_train), ["text", "author", "book_id"]]. \
     sample(frac=1, random_state=15)
-test_1000df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_test), ["text", "author", "book_id"]].\
+test_1000df = train_excerpt_df.loc[train_excerpt_df["book_id"].isin(X_groupby_test), ["text", "author", "book_id"]]. \
     sample(frac=1, random_state=15)
 X_1000test, y_1000test = test_1000df["text"], test_1000df["author"]
 
@@ -106,12 +107,12 @@ X_1000test, y_1000test = test_1000df["text"], test_1000df["author"]
 # = 0.284 -> Proportion of 1000 words excerpts belonging to test set
 
 # Splitting excerpts in training set into 500 words and creating 500 words test set
-train_500df = sample_excerpts(dataframe=train_1000df, stoppers=[".", "...", "!", "?"], size='short').\
+train_500df = sample_excerpts(dataframe=train_1000df, stoppers=[".", "...", "!", "?"], size='short'). \
     sample(frac=1, random_state=15)
 # train_500df["text"].apply(lambda x: len(nltk.word_tokenize(x))).describe()  # mean=496, std=18
 X_500train, y_500train = train_500df["text"], train_500df["author"]
 
-test_500df = sample_excerpts(dataframe=test_1000df, stoppers=[".", "...", "!", "?"], size='short').\
+test_500df = sample_excerpts(dataframe=test_1000df, stoppers=[".", "...", "!", "?"], size='short'). \
     sample(frac=1, random_state=15)
 # test_500df["text"].apply(lambda x: len(nltk.word_tokenize(x))).describe()  # mean=499, std=22
 X_500test, y_500test = test_500df["text"], test_500df["author"]
@@ -119,23 +120,6 @@ X_500test, y_500test = test_500df["text"], test_500df["author"]
 # Verifying 70/30 split
 # train_500df.shape[0]/(train_500df.shape[0] + test_500df.shape[0])
 # = 0.72 -> Proportion of 500 words excerpts belonging to training set
-
-# Over Sampling 500 words train set
-author_over_weights = {"LuisaMarquesSilva": int((y_500train == "LuisaMarquesSilva").sum()*1.5)}
-ros = RandomOverSampler(sampling_strategy=author_over_weights, random_state=15)
-X_temp, y_temp = X_500train.values.reshape(-1, 1), y_500train.values.reshape(-1, 1)
-X_500train, y_500train = ros.fit_resample(X_temp, y_temp)
-
-# Under Sampling 500 words train set
-author_under_weights = {"JoseRodriguesSantos": int((y_500train == "JoseRodriguesSantos").sum()*0.6)}
-rus = RandomUnderSampler(sampling_strategy=author_under_weights, random_state=15)
-# X_temp, y_temp = X_500train.reshape(-1, 1), y_500train.reshape(-1, 1)
-X_500train, y_500train = rus.fit_resample(X_500train, y_500train)
-
-# Shuffle training samples
-shuffle_temp = pd.DataFrame({"X": X_500train.flatten(), "y": y_500train}).sample(frac=1, random_state=15)
-X_500train, y_500train = shuffle_temp["X"].values, shuffle_temp["y"].values
-
 
 # Construct some pipelines
 pipe_cv_cnb = Pipeline([('cv', CountVectorizer()),
@@ -189,7 +173,6 @@ pipe_tfidf_pac = Pipeline([('tfidf', TfidfVectorizer()),
                            ('pac', PassiveAggressiveClassifier(class_weight='balanced', random_state=15))])
 
 # Set grid search params
-# NOTE: Keep in mind that the grid size is given by multiplication of the number of values to explore in each parameter!
 grid_params_cv_cnb = [{"cv__max_df": np.arange(0.8, 1.01, 0.05),
                        "cv__binary": [True, False],
                        "cv__stop_words": [[".", "...", "!", "?"], None],
@@ -393,59 +376,36 @@ gs_tfidf_pac = GridSearchCV(estimator=pipe_tfidf_pac,
                             n_jobs=jobs)
 
 # List of pipelines for ease of iteration
-grids = [gs_cv_mlpc, gs_cv_rfc]
-    # gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log,  gs_tfidf_log, gs_cv_rfc, gs_tfidf_rfc,
-    #      gs_cv_mlpc, gs_tfidf_mlpc, gs_cv_knc, gs_tfidf_knc, gs_cv_sgd, gs_tfidf_sgd, gs_cv_pac, gs_tfidf_pac]
+grids = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_log, gs_tfidf_log, gs_cv_knc, gs_tfidf_knc,
+         gs_cv_sgd, gs_tfidf_sgd, gs_cv_pac, gs_tfidf_pac, gs_cv_rfc, gs_tfidf_rfc, gs_cv_mlpc, gs_tfidf_mlpc]
 
 # Dictionary of pipelines and classifier types for ease of reference
-grid_labels = ["cv_mlpc", "cv_rfc"]
-    # "cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_log", "tfidf_log", "cv_rfc", "tfidf_rfc",
-    #      "cv_mlpc", "tfidf_mlpc", "cv_knc", "tfidf_knc", "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac"]
+grid_labels = ["cv_cnb", "tfidf_cnb", "cv_knn", "tfidf_knn", "cv_log", "tfidf_log", "cv_knc", "tfidf_knc",
+               "cv_sgd", "tfidf_sgd", "cv_pac", "tfidf_pac", "cv_rfc", "tfidf_rfc", "cv_mlpc", "tfidf_mlpc"]
 
 # Model Selection - Running Grid Searches
 model_selection(grids, X_500train, y_500train, [X_500test, X_1000test], [y_500test, y_1000test], grid_labels)
 
-
 # Load pickle files with fitted models
-gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
-gs_tfidf_cnb = load("./outputs/Pipeline_tfidf_cnb.pkl")
-gs_cv_knn = load("./outputs/Pipeline_cv_knn.pkl")
+# gs_cv_cnb = load("./outputs/Pipeline_cv_cnb.pkl")
+# gs_tfidf_cnb = load("./outputs/Pipeline_tfidf_cnb.pkl")
+# gs_cv_knn = load("./outputs/Pipeline_cv_knn.pkl")
 gs_tfidf_knn = load("./outputs/Pipeline_tfidf_knn.pkl")
 gs_cv_knc = load("./outputs/Pipeline_cv_knc.pkl")
-gs_tfidf_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
+# gs_tfidf_knc = load("./outputs/Pipeline_tfidf_knc.pkl")
 gs_cv_log = load("./outputs/Pipeline_cv_log.pkl")
-gs_tfidf_log = load("./outputs/Pipeline_tfidf_log.pkl")
+# gs_tfidf_log = load("./outputs/Pipeline_tfidf_log.pkl")
+# gs_cv_sgd = load("./outputs/Pipeline_cv_sgd.pkl")
+# gs_tfidf_sgd = load("./outputs/Pipeline_tfidf_sgd.pkl")
+# gs_cv_pac = load("./outputs/Pipeline_cv_pac.pkl")
+# gs_tfidf_pac = load("./outputs/Pipeline_tfidf_pac.pkl")
 # gs_cv_rfc = load("./outputs/Pipeline_cv_rfc.pkl")
 # gs_tfidf_rfc = load("./outputs/Pipeline_tfidf_rfc.pkl")
-gs_cv_sgd = load("./outputs/Pipeline_cv_sgd.pkl")
-gs_tfidf_sgd = load("./outputs/Pipeline_tfidf_sgd.pkl")
 # gs_cv_mlpc = load("./outputs/Pipeline_cv_mlpc.pkl")
 # gs_tfidf_mlpc = load("./outputs/Pipeline_tfidf_mlpc.pkl")
-gs_cv_pac = load("./outputs/Pipeline_cv_pac.pkl")
-gs_tfidf_pac = load("./outputs/Pipeline_tfidf_pac.pkl")
 
-# Ensemble
-# AdaBoost
-# clf = AdaBoostClassifier(base_estimator=[gs_cv_knc, gs_tfidf_knn], n_estimators=100, algorithm='SAMME', random_state=15)
-# clf.fit(X_500train, y_500train)
-# y_pred = clf.predict(X_500test)
-#
-# # Stacking classifier
-# clf = StackingClassifier(estimators=[gs_cv_knc, gs_tfidf_knn],
-#                          final_estimator=LogisticRegression(class_weight='balanced', multi_class='multinomial'))
-# clf.fit(X_500train, y_500train)
-# y_pred = clf.predict(X_500test)
-#
-# #  ('knn', gs_tfidf_knn), ('knc', gs_cv_knc)
-#
-# sclf = StackingCVClassifier(classifiers=[gs_cv_knc, gs_tfidf_knn],
-#                             meta_classifier=LogisticRegression(class_weight='balanced', multi_class='multinomial'),
-#                             random_state=15)
-# sclf.fit(X_500train, y_500train)
-# y_pred = sclf.predict(y_500test)
-
-#Vote Classifier
-    #Test ensemble combinations:
+# Ensemble - Vote Classifier
+# Test ensemble combinations:
 def ensemble_vote(n_combinations, excerpt_size):
     """
     Parameters:
@@ -460,7 +420,6 @@ def ensemble_vote(n_combinations, excerpt_size):
         large = 1000 words excerpt.
         """
 
-
     if excerpt_size == 'large':
         X_train = X_500train
         X_test = X_1000test
@@ -474,10 +433,10 @@ def ensemble_vote(n_combinations, excerpt_size):
         y_test = y_500test
 
     models_list = [gs_cv_cnb, gs_tfidf_cnb, gs_cv_knn, gs_tfidf_knn, gs_cv_knc, gs_tfidf_knc,
-                   gs_cv_log,gs_tfidf_log, gs_cv_pac, gs_tfidf_pac] # gs_cv_rfc, gs_tfidf_rfc
+                   gs_cv_log, gs_tfidf_log, gs_cv_pac, gs_tfidf_pac]  # gs_cv_rfc, gs_tfidf_rfc
 
-    models_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn','cv_knc','tfidf_knc',
-                     'cv_log','tfidf_log','cv_pac', 'tfidf_pac'] #'cv_rfc', 'tfidf_rfc'
+    models_labels = ['cv_cnb', 'tfidf_cnb', 'cv_knn', 'tfidf_knn', 'cv_knc', 'tfidf_knc',
+                     'cv_log', 'tfidf_log', 'cv_pac', 'tfidf_pac']  # 'cv_rfc', 'tfidf_rfc'
 
     models_comb = list(itertools.combinations(models_list, n_combinations))
     labels_comb = list(itertools.combinations(models_labels, n_combinations))
@@ -493,17 +452,20 @@ def ensemble_vote(n_combinations, excerpt_size):
         results = (dict(sorted(zip(score, labels_comb), reverse=True)))
 
     print('The top 3 ensembles for combinations of {} and excerpt size "{}" are: \n{}'
-          .format(n_combinations,excerpt_size,results))
-
-ensemble_vote(3,'large') #short or large
+          .format(n_combinations, excerpt_size, results))
 
 
-#Fit ensemble:
-ensemble = EnsembleVoteClassifier(clfs=[gs_tfidf_knn,gs_cv_knc,gs_cv_log],
-                                  voting='hard', refit=False)
+# Find best ensemble of individual models
+ensemble_vote(3, 'short')  # short or large
+
+# Fit ensemble:
+best_ensemble = [gs_tfidf_knn, gs_cv_knc, gs_cv_log]
+ensemble = EnsembleVoteClassifier(clfs=best_ensemble, voting='hard', refit=False)
 ensemble.fit(X_500train, y_500train)
-# y_pred = ensemble.predict(X_1000test)
-# print('The recall of the (tfidf_knn, cv_knc, cv_pac) is: ', f1_score(y_1000test, y_pred, average='macro'))
+# dump(ensemble, "./outputs/Pipeline_ensemble.pkl", compress=1)  # dump ensemble into pickle file
+
+# Load fitted ensemble (in case you just want to get the final fitted model):
+ensemble = load("./outputs/Pipeline_ensemble.pkl")
 
 
 # Model Assessment
@@ -526,7 +488,148 @@ xlsx_path = './outputs/Pipelines.xlsx'
 # Comparing Test Error Score between Pipelines
 model_assessment_vis(xlsx_path, labels)
 
-# Creating excel with classification report of each model
+# Comparing Test Error Score between Pipelines by Author
+xlsx_path = './outputs/classification_reports.xlsx'
+model_assessment_author_vis(xlsx_path, labels)
+
+# Assessing best model
+best_model = ensemble
+y_500pred = best_model.predict(X_500test)
+y_1000pred = best_model.predict(X_1000test)
+
+# Classification report
+print(classification_report(y_500test, y_500pred, target_names=list(np.unique(y_500test))))
+print(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(y_1000test))))
+
+# Plot confusion matrix
+plot_cm(confusion_matrix(y_500test, y_500pred), np.unique(y_500test))
+plot_cm(confusion_matrix(y_1000test, y_1000pred), np.unique(y_1000test))
+
+
+# Prediction
+# ----------------------------------------------------------------------------------------------------------------------
+# Identifier
+submission_df["index"] = submission_df["file"].str.replace("Palavras", "words_").str.replace("/", "").\
+    str.replace("test", "").str.replace(".txt", "")
+
+# Predict the author in the submission set
+submission = cleaner.transform(submission_df["text"])
+y_submission = best_model.predict(submission)
+
+# Creating csv file with predictions
+submission = pd.Series(y_submission, index=submission_df.index, name="predicted_authors")
+submission.index = submission_df["index"]
+submission.to_csv("./outputs/submission.csv", index=True)
+
+
+# Extras
+# ----------------------------------------------------------------------------------------------------------------------
+# POS Tagging ----------------------------------------------------------------------------------------------------------
+# stok = nltk.data.load('tokenizers/punkt/portuguese.pickle')
+#
+# stok.tokenize(train_df["text"])
+#
+#  text = word_tokenize(test)
+# pos = nltk.corpus.mac_morpho.tagged_words()
+# nltk.corpus.mac_morpho.tagged_sents(text)
+#
+# text.tagged_words()
+# X = pos.fit_transform(text)
+#
+#
+# Over Sampling 500 words train set ------------------------------------------------------------------------------------
+# author_over_weights = {"LuisaMarquesSilva": int((y_500train == "LuisaMarquesSilva").sum()*1.5)}
+# ros = RandomOverSampler(sampling_strategy=author_over_weights, random_state=15)
+# X_temp, y_temp = X_500train.values.reshape(-1, 1), y_500train.values.reshape(-1, 1)
+# X_500train, y_500train = ros.fit_resample(X_temp, y_temp)
+#
+# # Under Sampling 500 words train set
+# author_under_weights = {"JoseRodriguesSantos": int((y_500train == "JoseRodriguesSantos").sum()*0.6)}
+# rus = RandomUnderSampler(sampling_strategy=author_under_weights, random_state=15)
+# # X_temp, y_temp = X_500train.reshape(-1, 1), y_500train.reshape(-1, 1)
+# X_500train, y_500train = rus.fit_resample(X_500train, y_500train)
+#
+# # Shuffle training samples
+# shuffle_temp = pd.DataFrame({"X": X_500train.flatten(), "y": y_500train}).sample(frac=1, random_state=15)
+# X_500train, y_500train = shuffle_temp["X"].values, shuffle_temp["y"].values
+#
+#
+# Word Embeddings ------------------------------------------------------------------------------------------------------
+# def tokenize_corpus(corpus):
+#     tokens = [x.split() for x in corpus]
+#     return tokens
+#
+# def build_training(tokenized_corpus, word2idx, window_size=2):
+#     idx_pairs = []
+#
+#     # for each sentence
+#     for sentence in tokenized_corpus:
+#         indices = [word2idx[word] for word in sentence]
+#         # for each word, threated as center word
+#         for center_word_pos in range(len(indices)):
+#             # for each window position
+#             for w in range(-window_size, window_size + 1):
+#                 context_word_pos = center_word_pos + w
+#                 # make soure not jump out sentence
+#                 if context_word_pos < 0 or \
+#                         context_word_pos >= len(indices) or \
+#                         center_word_pos == context_word_pos:
+#                     continue
+#                 context_word_idx = indices[context_word_pos]
+#                 idx_pairs.append((indices[center_word_pos], context_word_idx))
+#     return np.array(idx_pairs)
+#
+#
+# def get_onehot_vector(word_idx, vocabulary):
+#     x = torch.zeros(len(vocabulary)).float()
+#     x[word_idx] = 1.0
+#     return x
+#
+#
+# def Skip_Gram(training_pairs, vocabulary, embedding_dims=100, learning_rate=0.001, epochs=10):
+#     torch.manual_seed(3)
+#     W1 = Variable(torch.randn(embedding_dims, len(vocabulary)).float(), requires_grad=True)
+#     losses = []
+#     for epo in (range(epochs)):
+#         loss_val = 0
+#         for input_word, target in training_pairs:
+#             x = Variable(get_onehot_vector(input_word, vocabulary)).float()
+#             y_true = Variable(torch.from_numpy(np.array([target])).long())
+#
+#             # Matrix multiplication to obtain the input word embedding
+#             z1 = torch.matmul(W1, x)
+#
+#             # Matrix multiplication to obtain the z score for each word
+#             z2 = torch.matmul(torch.transpose(W1, 0, 1), z1)
+#
+#             # Apply Log and softmax functions
+#             log_softmax = F.log_softmax(z2, dim=0)
+#             # Compute the negative-log-likelihood loss
+#             loss = F.nll_loss(log_softmax.view(1, -1), y_true)
+#             loss_val += loss.item()
+#
+#             # compute the gradient in function of the error
+#             loss.backward()
+#
+#             # Update your embeddings
+#             W1.data -= learning_rate * W1.grad.data
+#
+#             W1.grad.data.zero_()
+#
+#         losses.append(loss_val / len(training_pairs))
+#
+#     return W1, losses
+#
+# tokenized_corpus = tokenize_corpus(X_500train)
+# vocabulary = {word for doc in tokenized_corpus for word in doc}
+# word2idx = {w:idx for (idx, w) in enumerate(vocabulary)}
+#
+# training_pairs = build_training(tokenized_corpus, word2idx)
+#
+# W1, losses = Skip_Gram(training_pairs, word2idx)
+#
+#
+# Creating excel with classification report of each model --------------------------------------------------------------
 # for i in grid_labels:
 #     gs = load("./outputs/Pipeline_{}.pkl".format(i))
 #     y_500pred, y_1000pred = gs.predict(X_500test), gs.predict(X_1000test)
@@ -539,25 +642,9 @@ model_assessment_vis(xlsx_path, labels)
 #     cr_total = pd.concat([cr_500, cr_1000])
 #     save_excel(cr_total, i, "classification_reports")
 #     del gs
-
-# Comparing Test Error Score between Pipelines by Author
-xlsx_path = './outputs/classification_reports.xlsx'
-model_assessment_author_vis(xlsx_path, labels)
-
-# Assessing best model
-best_params = {'knn__n_neighbors': 5, 'knn__weights': 'distance', 'tfidf__binary': True,
-               'tfidf__max_df': 0.8, 'tfidf__ngram_range': (1, 3), 'tfidf__stop_words': ['.', '...', '!', '?']}
-best_gs = pipe_tfidf_knn.set_params(**best_params).fit(X_500train, y_500train)
-y_500pred, y_1000pred = best_gs.predict(X_500test), best_gs.predict(X_1000test)
-
-# Assessing emsemble
-y_500pred = ensemble.predict(X_500test)
-y_1000pred = ensemble.predict(X_1000test)
-
-# classification report
-print(classification_report(y_500test, y_500pred, target_names=list(np.unique(y_500test))))
-print(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(y_1000test))))
-
+#
+#
+# Graphic to compare best model test performance over several sampling configurations ----------------------------------
 # import plotly.graph_objects as go
 # import plotly.offline as pyo
 #
@@ -595,111 +682,10 @@ print(classification_report(y_1000test, y_1000pred, target_names=list(np.unique(
 #     yaxis_title="Test F1-Score"
 # )
 # pyo.plot(fig)
-
-# plot confusion matrix
-plot_cm(confusion_matrix(y_500test, y_500pred), np.unique(y_500test))
-plot_cm(confusion_matrix(y_1000test, y_1000pred), np.unique(y_1000test))
-
-
-# Prediction
-# ----------------------------------------------------------------------------------------------------------------------
-# Predict the author in the submission set
-best_pipeline = gs_cv_knc
-submission = cleaner.transform(submission_df["text"])
-y_submission = best_pipeline.predict(submission)
-
-# Creating csv file with predictions
-submission = pd.Series(y_submission, index=submission_df.index)
-submission.to_csv("./outputs/submission.csv", index=False)
-
-# Extras
-# ----------------------------------------------------------------------------------------------------------------------
-# # Feature Engineering
-# # Bag-of-words
-# cv = CountVectorizer(max_df=0.9, binary=True, stop_words=[".", "...", "!", "?"])  # ignores terms with document
-# # frequency above 0.9
-# X = cv.fit_transform(X_train)
-# y = y_train
-# X_test = cv.transform(X_test)
 #
-# # N-Gram
-# cv = CountVectorizer(
-#     max_df=0.9,
-#     binary=False,
-#     stop_words=[".", "...", "!", "?"],
-#     ngram_range=(1, 3)
-# )
-# X = cv.fit_transform(X_train)
-# y = y_train
-# X_test = cv.transform(X_test)
 #
-# top_df = get_top_n_grams(X_train, top_k=20, n=1)
-# # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=2)
-# # top_df = get_top_n_grams(train_excerpt_df["text"], top_k=20, n=3)
-#
-# # TF-IDF
-# cv = TfidfVectorizer(max_df=0.8, stop_words=[".", "...", "!", "?"], ngram_range=(1, 3))
-# X = cv.fit_transform(X_train)
-# y = y_train
-# X_test = cv.transform(X_test)
-#
-# feature_names = cv.get_feature_names()
-#
-# # Model
-# # Naive Bayes Classifier
-# modelnaive = ComplementNB()  # ComplementNB appropriate for text data and imbalanced classes
-# modelnaive.fit(X, y_train)
-# y_pred = modelnaive.predict(X_test)
-#
-# # K-nearest neighbors
-# modelknn = KNeighborsClassifier(n_neighbors=5,
-#                                 weights='distance',
-#                                 metric='cosine')
-# modelknn.fit(X, y_train)
-# y_pred = modelknn.predict(X_test)
-#
-# # Word2Vec
-# # X_train = pd.DataFrame(X)
-# # word2vec = Word2Vec(,min_count = 1, size = 100, window = 5)
-# # y_pred = word2vec.predict(X_dev)
-#
-# # Logistic Regression
-# log_reg = LogisticRegression(multi_class='multinomial', random_state=15).fit(X, y)
-# y_pred = log_reg.predict(X_test)
-#
-# # Random Forest Classifier
-# rfc = RandomForestClassifier(class_weight='balanced', random_state=15).fit(X, y)
-# y_pred = rfc.predict(X_test)
-#
-# unique, counts = np.unique(y_pred, return_counts=True)
-# print(np.asarray((unique, counts)).T)
-#
-# POS Tagging
-# stok = nltk.data.load('tokenizers/punkt/portuguese.pickle')
-#
-# stok.tokenize(train_df["text"])
-#
-#  text = word_tokenize(test)
-# pos = nltk.corpus.mac_morpho.tagged_words()
-# nltk.corpus.mac_morpho.tagged_sents(text)
-
-# text.tagged_words()
-# X = pos.fit_transform(text)
-
 # References
 # ----------------------------------------------------------------------------------------------------------------------
 # https://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
 # https://scikit-learn.org/stable/modules/cross_validation.html
 # https://scikit-learn.org/stable/modules/grid_search.html
-
-#
-# cv_f1500 = [0.643818771348588,0.810768480733043,0.946949887046312,0.930998002111493,0.930998080452325,0.926667]
-# cv_f11000= [0.575557752051885,0.852971331291678,0.823053566426323,0.960478263714171,0.943030399251382,0.961667]
-# sum(cv_f11000)/6
-#
-# tfidf_f1500 = [0.401747924904321,0.919370456993357,0.853246901281279,0.727165581182741,0.865584495601857,0.873333]
-#
-# tfidf_f11000 = [0.412220428836646,0.982182981239585,0.891593046662732,0.773217666840039,0.852135351692357,0.916667]
-#
-# sum(tfidf_f1500)/6
-# sum(tfidf_f11000)/6
