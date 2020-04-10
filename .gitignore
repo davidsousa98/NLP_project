@@ -6,6 +6,7 @@ outputs_pre/*
 .DS_Store
 .html
 TM_Report.pdf
+nlp_delivery.zip
 #nlp_data.zip
 
 # Byte-compiled / optimized / DLL files
